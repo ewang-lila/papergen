@@ -1,0 +1,322 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arXiv Q&A Output</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #1a1a1a;
+            text-align: center;
+            border-bottom: 2px solid #eaeaea;
+            padding-bottom: 10px;
+        }
+        .paper {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        h2 {
+            color: #0056b3;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        code {
+            background-color: #eee;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+        pre code {
+            display: block;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>arXiv Question-Answer Pairs</h1>
+    
+<div class="paper">
+    <h2>Paper: <a href="https://arxiv.org/abs/2506.17126v1" target="_blank">2506.17126v1</a></h2>
+    <div class="llm-output">
+        <h3>Problem 1</h3>
+
+<p><strong>Background.</strong> In relaxor ferroelectrics the dielectric response above the temperature where the permittivity reaches its maximum is often described by a modified Curie–Weiss law that accounts for the diffuse nature of the phase transition. In this description, the dielectric permittivity is denoted by (\varepsilon'), the absolute temperature by (T), and the temperature of maximum permittivity by (T_M); the value of the permittivity at (T_M) is (\varepsilon_M'). In addition, a Curie-like constant (C) and a diffuseness exponent (\gamma) (with (\gamma=1) corresponding to a normal ferroelectric and (\gamma=2) to an ideal relaxor) are introduced to quantify the spread of the transition. The phenomenological expression relates these quantities by comparing the reciprocal permittivities.  </p>
+
+<p><strong>Task.</strong> Derive the analytic expression that relates (\frac{1}{\varepsilon'}) and (\frac{1}{\varepsilon_M'}) to the difference (T-T_M) and the exponent (\gamma), with the proportionality constant (1/C).</p>
+
+<p><strong>Solution:</strong><br />
+[
+\frac{1}{\varepsilon'}-\frac{1}{\varepsilon_M'(f)}=\frac{1}{C}\Bigl(T-T_M(f)\Bigr)^\gamma.
+\tag{2}
+]</p>
+
+<hr />
+
+<h3>Problem 2</h3>
+
+<p><strong>Background.</strong> In perovskite lead scandium tantalate (PST), the degree of B-site ordering is quantified by analyzing the intensity of specific X-ray diffraction (XRD) peaks. The pseudocubic (111) reflection appears as a superstructure peak only in the presence of Rocksalt-type ordering of the B-site cations, whereas the (200) reflection is allowed regardless of ordering. Let (I_{111}) and (I_{200}) be the XRD peak intensities of the (111) and (200) reflections, respectively, and let the quantity (\left(\frac{I_{111}}{I_{200}}\right)_{S=1}) denote the intensity ratio expected for a perfectly ordered sample. The ordering parameter (S) (with (0 \leq S \leq 1)) is defined by comparing the measured ratio to that of the fully ordered case.  </p>
+
+<p><strong>Task.</strong> Derive the analytic formula for (S^2) in terms of the measured intensity ratio (\frac{I_{111}}{I_{200}}) and its fully ordered value (\left(\frac{I_{111}}{I_{200}}\right)_{S=1}).</p>
+
+<p><strong>Solution:</strong><br />
+[
+S^2 = \frac{\left(\dfrac{I_{111}}{I_{200}}\right)}{\left(\dfrac{I_{111}}{I_{200}}\right)_{S=1}}.
+\tag{3}
+]</p>
+
+<hr />
+
+<h3>Problem 3</h3>
+
+<p><strong>Background.</strong> Experimental investigations on PST have demonstrated a direct quantitative connection between the structural order and the diffuseness of the phase transition. Here, the structural ordering is quantified by the ordering parameter (S) (with (0) corresponding to complete disorder and (1) to full Rocksalt order) and the relaxor nature by the diffuseness exponent (\gamma) (where (\gamma=2) corresponds to perfect relaxor behavior and (\gamma\approx1) to a normal ferroelectric transition). Empirical data over a wide range of sample geometries (thin films, multilayer capacitors, and bulk ceramics) reveal a linear correlation between (\gamma) and (S).  </p>
+
+<p><strong>Task.</strong> Derive the linear relation between the diffuseness exponent (\gamma) and the structural order parameter (S).</p>
+
+<p><strong>Solution:</strong><br />
+[
+\gamma(S) = 1.93 - 1.06\, S.
+]</p>
+
+    </div>
+</div>
+
+<div class="paper">
+    <h2>Paper: <a href="https://arxiv.org/abs/2506.17139v1" target="_blank">2506.17139v1</a></h2>
+    <div class="llm-output">
+        <p>Below are three self‑contained graduate‑level exercises based exactly on analytic results from the paper “Consistent Sampling and Simulation: Molecular Dynamics with Energy‑Based Diffusion Models.” Each question provides all necessary definitions and assumptions, followed by a clear “Task” and then a “Solution” that quotes the final expression verbatim from the paper.</p>
+
+<hr />
+
+<h3>Problem 1</h3>
+
+<p><strong>Background.</strong><br />
+In the variance‑preserving (VP) diffusion formulation the forward stochastic differential equation (SDE) is defined by<br />
+[
+\d{\mathbf{x}} = \mathbf{f}(\mathbf{x}, t)\,\d{t} + g(t)\,\d{\mathbf{w}},
+]<br />
+with drift and diffusion coefficients chosen as<br />
+[
+\mathbf{f}(\mathbf{x},t) = -\tfrac{1}{2}\beta(t)\,\mathbf{x}, \quad g(t)=\sqrt{\beta(t)}\,,
+]<br />
+where the noise schedule is given by<br />
+[
+\beta(t)=\beta_{\min}+t\cdot(\beta_{\max}-\beta_{\min}).
+]<br />
+Under these assumptions the forward process is linear in (\mathbf{x}) and its solution (i.e. the transition kernel) can be written in closed form as a Gaussian probability density.  </p>
+
+<p><strong>Task.</strong><br />
+Derive the analytic expression for the transition kernel<br />
+[
+p_t(\mathbf{x}(t) \mid \mathbf{x}(0))
+]<br />
+in closed form, showing that it is a Gaussian with a mean that is a scaled version of (\mathbf{x}(0)) and covariance proportional to the identity matrix.</p>
+
+<p><strong>Solution.</strong><br />
+The paper states the final transition kernel as follows:<br />
+[
+p_t(\mathbf{x}(t) \mid \mathbf{x}(0)) = \mathcal{N}\Bigl(\mathbf{x}(t);\,e^{-\frac{1}{2}\int_{0}^{t}\beta(s)\,\mathrm{d}s}\,\mathbf{x}(0),\,\bigl(1-e^{-\int_{0}^{t}\beta(s)\,\mathrm{d}s}\bigr)I\Bigr).
+]
+See the paragraph beginning “With this specific choice…” in the paper.</p>
+
+<hr />
+
+<h3>Problem 2</h3>
+
+<p><strong>Background.</strong><br />
+Suppose that a molecular system has an equilibrium (Boltzmann) distribution given by<br />
+[
+p(\mathbf{x}) = \frac{\exp\Bigl(-\frac{U(\mathbf{x})}{k_BT}\Bigr)}{Z},
+]<br />
+where (U(\mathbf{x})) is the potential energy, (k_BT) is the thermal energy, and (Z) is a normalization constant. Diffusion models trained on equilibrium (Boltzmann‑distributed) data learn a score function defined as<br />
+[
+\mathbf{s}(\mathbf{x},t) \approx \nabla_{\mathbf{x}} \log p_t(\mathbf{x}).
+]<br />
+When the model is evaluated at the final time (t=0) (corresponding to data), the score relates directly to the forces.  </p>
+
+<p><strong>Task.</strong><br />
+Derive the final expression that relates the score at (t=0) to the forces by computing<br />
+[
+\nabla_{\mathbf{x}} \log p_{t=0}(\mathbf{x}),
+]<br />
+and show that it is proportional to (-\nabla_{\mathbf{x}} U(\mathbf{x})).</p>
+
+<p><strong>Solution.</strong><br />
+The paper gives the following relationship:
+[
+\mathbf{s}(\mathbf{x},t=0) \approx \nabla_{\mathbf{x}} \log p_{t=0}(\mathbf{x}) 
+= \nabla_{\mathbf{x}} \log\exp\Bigl(-\frac{U(\mathbf{x})}{k_BT}\Bigr) - \nabla_{\mathbf{x}}\log Z 
+= -\frac{1}{k_BT}\nabla_{\mathbf{x}} U(\mathbf{x}).
+]
+See the paragraph following Equation (17) in the paper.</p>
+
+<hr />
+
+<h3>Problem 3</h3>
+
+<p><strong>Background.</strong><br />
+For a diffusion model whose unnormalized density ( \log p_t(\mathbf{x}) ) is parameterized via an energy‐based (conservative) network, the Fokker–Planck equation in log‑density form reads<br />
+[
+\partial_t \log p_t(\mathbf{x}) = \mathcal{F}_{p}(\mathbf{x},t) \triangleq \frac{1}{2}g^2(t)\Bigl[\operatorname{div}_{\mathbf{x}}\bigl(\nabla_{\mathbf{x}}\log p_t(\mathbf{x})\bigr)+\left\Vert\nabla_{\mathbf{x}}\log p_t(\mathbf{x})\right\Vert_2^2\Bigr] -\langle \mathbf{f}(\mathbf{x},t),\nabla_{\mathbf{x}}\log p_t(\mathbf{x})\rangle -\operatorname{div}_{\mathbf{x}}(\mathbf{f}(\mathbf{x},t)).
+]
+Defining the Fokker–Planck residual by<br />
+[
+R(\mathbf{x},t)=\mathcal{F}_{p}(\mathbf{x},t)-\partial_t \log p_t(\mathbf{x}),
+]
+the paper introduces a “weak” residual obtained by averaging over a small Gaussian perturbation (\mathbf{v}\sim\mathcal{N}(0,\sigma^2 I)). This helps to obtain an unbiased estimator requiring only first‑order derivatives.  </p>
+
+<p><strong>Task.</strong><br />
+Derive the unbiased estimator of the weak residual using a sample (\mathbf{v}) and show that it can be expressed as<br />
+[
+\begin{aligned}
+\widetilde{R}(\mathbf{x},t;\mathbf{v}) = \; &amp;\frac{1}{2}g^2(t)\left[ \left(\frac{\mathbf{v}}{\sigma}\right)^{\top}\frac{\mathbf{s}(\mathbf{x}+\mathbf{v},t)-\mathbf{s}(\mathbf{x}-\mathbf{v},t)}{2\sigma}+\left\Vert \mathbf{s}(\mathbf{x}+\mathbf{v},t)\right\Vert^2_2\right] \
+&amp;-\langle \mathbf{f}(\mathbf{x}+\mathbf{v},t),\mathbf{s}(\mathbf{x}+\mathbf{v},t)\rangle-\operatorname{div}_{\mathbf{x}}(\mathbf{f}(\mathbf{x}+\mathbf{v},t))-\partial_t \log p_t(\mathbf{x}+\mathbf{v}).
+\end{aligned}
+]</p>
+
+<p><strong>Solution.</strong><br />
+The paper states the result verbatim in its theorem on the weak residual formulation. The final expression given is:
+[
+\begin{aligned}
+\widetilde{R}(\mathbf{x},t;\mathbf{v}) = \; &amp;\frac{1}{2} g^2(t) \left[ \left(\frac{\mathbf{v}}{\sigma}\right)^{\top}\frac{\mathbf{s}(\mathbf{x}+\mathbf{v},t)-\mathbf{s}(\mathbf{x}-\mathbf{v},t)}{2\sigma} + \left\Vert\mathbf{s}(\mathbf{x}+\mathbf{v},t)\right\Vert^2_2 \right] \
+&amp;
+ - \langle \mathbf{f}(\mathbf{x}+\mathbf{v},t), \mathbf{s}(\mathbf{x}+\mathbf{v},t) \rangle - \operatorname{div}_{\mathbf{x}}\bigl(\mathbf{f}(\mathbf{x}+\mathbf{v},t)\bigr) - \partial_t \log p_t(\mathbf{x}+\mathbf{v}).
+\end{aligned}
+]
+Moreover, this yields an unbiased estimator of the squared residual via
+[
+\left\Vert \widetilde{R}(\mathbf{x},t)\right\Vert_2^2 \approx \widetilde{R}(\mathbf{x},t;\mathbf{v})\cdot \widetilde{R}(\mathbf{x},t;\mathbf{v}') \quad\text{with}\quad \mathbf{v},\mathbf{v}'\sim\mathcal{N}(0,\sigma^2 I).
+]
+See “Theorem” (labeled in the paper) and the accompanying discussion in the “Finite Difference Approximation” section.</p>
+
+<hr />
+
+<p>These problems are designed to test your understanding of the analytic derivations that underpin the energy‑based diffusion modeling approach for consistent molecular sampling and simulation as presented in the paper.</p>
+
+    </div>
+</div>
+
+<div class="paper">
+    <h2>Paper: <a href="https://arxiv.org/abs/2506.17194v1" target="_blank">2506.17194v1</a></h2>
+    <div class="llm-output">
+        <h3>Problem 1</h3>
+
+<p><strong>Background.</strong><br />
+Consider the two-dimensional classical Ising model defined on a square lattice with the Hamiltonian<br />
+[
+H = -\sum_{\langle i,j \rangle} \sigma_i \sigma_j,
+]<br />
+where the spin variables (\sigma_k) take values in ({0,1}) and the summation (\langle i,j \rangle) is over nearest-neighbor pairs. In this model, the magnetization at a lattice site is given by<br />
+[
+M_{(i_x,i_y)} = \langle \sigma_{(i_x,i_y)} \rangle.
+]<br />
+In particular, the central (bulk) magnetization is defined as<br />
+[
+M \equiv \langle \sigma_{(N/2, N/2)} \rangle.
+]<br />
+A well-known analytic result for the bulk magnetization of the Ising model was derived by Yang.  </p>
+
+<p><strong>Task.</strong><br />
+Derive the analytic expression for the exact bulk magnetization (M) expressed solely in terms of the temperature (T).  </p>
+
+<p><strong>Solution:</strong><br />
+[
+M = \left[ 1- \frac1{\sinh^4\left(\frac{1}{T}\right)}\right]^{\frac18}
+\quad \text{(see Equation (4) in the paper).}
+]</p>
+
+<hr />
+
+<h3>Problem 2</h3>
+
+<p><strong>Background.</strong><br />
+In the two-dimensional Ising model defined on a square lattice (with Hamiltonian<br />
+[
+H = -\sum_{\langle i,j \rangle} \sigma_i \sigma_j,
+]<br />
+and with spins (\sigma_k\in{0,1})), the central magnetization is given by<br />
+[
+M = \left[ 1- \frac{1}{\sinh^4\left(\frac{1}{T}\right)}\right]^{\frac18},
+]<br />
+where (T) is the temperature. To study the temperature dependence near criticality, one considers the first derivative of the magnetization with respect to (T), defined as<br />
+[
+M' = \frac{dM}{dT}.
+]  </p>
+
+<p><strong>Task.</strong><br />
+Derive the analytic expression for the first derivative (M') of the bulk magnetization with respect to the temperature (T).  </p>
+
+<p><strong>Solution:</strong><br />
+[
+M' = \frac{1}{T^2M^7}\frac{\cosh\left(\frac{2}{T}\right)}{\sinh^5\left(\frac{2}{T}\right)}
+\quad \text{(see the equation following Equation (4) in the paper).}
+]</p>
+
+<hr />
+
+<h3>Problem 3</h3>
+
+<p><strong>Background.</strong><br />
+Near the critical temperature (T_C) of the two-dimensional Ising model, the singular behavior of the magnetization is characterized by critical exponents. In numerical analyses, the ratio<br />
+[
+R(T) = \frac{M}{M'}
+]<br />
+is used to extract the critical exponent (\beta) (which relates to the leading non-analytical behavior of the magnetization). In the vicinity of (T_C), this ratio is approximated by a Taylor expansion in ((T_C - T)) as follows:<br />
+[
+R(T) =  -\frac{1}{\beta}\left(T_C - T\right) + c\left(T_C - T\right)^2,
+]<br />
+where (c) is a constant and (\beta) is the critical exponent.  </p>
+
+<p><strong>Task.</strong><br />
+Derive the analytic expression for the approximated ratio (R(T) = \frac{M}{M'}) in the vicinity of the critical temperature (T_C), expressing it in the form<br />
+[
+R(T) =  -\frac{1}{\beta}\left(T_C - T\right) + c\left(T_C - T\right)^2.
+]</p>
+
+<p><strong>Solution:</strong><br />
+[
+R(T) =  -\frac{1}{\beta}\left(T_C - T\right) + c\left(T_C - T\right)^2
+\quad \text{(see Equation (7) in the paper).}
+]</p>
+
+<hr />
+
+<h3>Problem 4</h3>
+
+<p><strong>Background.</strong><br />
+For the two-dimensional Ising model on a square lattice with mixed boundary conditions, the boundary (or edge) magnetization is defined at a site on the edge of the lattice. When the magnetization is measured at a site in the middle of the border,<br />
+[
+M_b = \langle \sigma_{(1, N/2)} \rangle,
+]<br />
+an analytic expression for this boundary magnetization is known. This expression involves hyperbolic functions and reflects the altered critical behavior at the boundary compared to the bulk.  </p>
+
+<p><strong>Task.</strong><br />
+Derive the analytic expression for the exact boundary magnetization (M_b) expressed solely in terms of the temperature (T).  </p>
+
+<p><strong>Solution:</strong><br />
+[
+M_b = \sqrt{\frac{\cosh\left(\frac{2}{T}\right) - \coth\left(\frac{2}{T}\right)}{\cosh\left(\frac{2}{T}\right)-1}}
+\quad \text{(see Equation (5) in the paper).}
+]</p>
+
+    </div>
+</div>
+
+</body>
+</html>

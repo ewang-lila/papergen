@@ -1,0 +1,99 @@
+\section{Method} \label{sec:method}
+We introduce a \emph{Fokker-Planck}-based regularization that improves the consistency between iid samples and the learned energy in diffusion models, to enable more accurate molecular dynamics. To this end, we leverage a conservative neural network parameterization to evaluate the time derivative of the model's unnormalized density to enforce consistency with the Fokker-Planck equation in training. 
+
+\subsection{Improving Consistency with the Fokker-Planck Equation}
+% See section 5.2 here https://users.aalto.fi/~asolin/sde-book/sde-book.pdf
+The Fokker-Planck equation \citep{oksendal2003, saarka2019} is a partial differential equation that describes the time evolution of probability densities in stochastic processes, including diffusion models. For the diffusion \gls{SDE} introduced in \cref{eq:forward-diffusion}, the log-density formulation of the Fokker-Planck equation \citep{lai2023, hu2024scorebased} can be written as
+\begin{equation}
+    \partial_t \log \prob_\t(\x) = \cF_\prob(\x, \t) \triangleq \frac{1}{2} \g^2(\t) \left[ \Div_\x (\nabla_\x \log \prob_\t) + \left\Vert \nabla_\x \log \prob_\t \right\Vert^2_2 \right] - \langle \f, \nabla_\x \log \prob_\t \rangle - \Div_\x (\f),
+    \label{eq:fokker-planck}
+\end{equation}
+where $\Div_\x$ denotes the divergence operator $\Div_\x \bF = \mathrm{tr}\left( \partial_\x \bF \right)$.
+
+\textbf{Fokker-Planck regularization.} The energy $\log \nnetprob_\t$ of a well-trained diffusion model should satisfy \cref{eq:fokker-planck}. However, we will show empirically in \cref{sec:experiments} that diffusion models do not fulfill the Fokker-Planck equation, particularly for small $\t$. 
+This aligns with previous findings on the self-consistency of diffusion models \citep{koehler2023statistical, lai2023, li2023generalization}, and empirical results where \gls{MD} simulations with the score do not match the data distribution \citep{arts2023}. 
+Building upon this prior work, we show that by minimizing this Fokker-Planck deviation, the model's score $\nabla_x \log \nnetprob_0$ more accurately describes the forces and aligns better with iid samples.
+
+The natural approach to ensure that the model is consistent with \cref{eq:fokker-planck} is to add a regularization term. Alongside the usual diffusion objective, we propose to minimize the residual error
+\begin{equation}
+    \left\Vert \residual(\x, \t)\right\Vert^2_2 = 
+    \left\Vert \cF_{\nnetprob} (\x, \t) - \partial_\t \log \nnetprob_\t(\x) \right\Vert^2_2,
+    \label{eq:residual}
+\end{equation}
+and define the corresponding loss as $\fploss [\log \nnetprob](\x, \t) = \lambda_{FP}(\t) D^{-2}  \left\Vert \residual(\x, \t) \right\Vert^2_2,$
+where $\x \in \bbR^D$ and $\lambda_{FP}$ is a time-dependent weighting function, which we set to be the same as $\lambda$. This formulation is only feasible when using a conservative energy-based model, as we need to evaluate $\partial_\t \log \nnetprob_\t$. 
+With this, the full training objective becomes
+\begin{equation}
+    \argmin_{\params} \E_{\t \sim \mathcal{U}(0, 1)} \E_{\x(0)} \E_{\x(t) \cond \x(0)} \left[ \dsmloss [\nabla_\x \log \nnetprob](\x(\t), \t) + \regstrength \cdot \fploss [\log \nnetprob](\x(\t), \t) \right],
+    \label{eq:fp-training}
+\end{equation}
+where $\regstrength$ is a hyperparameter that determines the regularization strength. As we will show in \cref{sec:experiments}, minimizing this regularized loss improves consistency between iid sampling and Langevin simulation of diffusion models, allowing for more accurate \gls{MD} simulations.
+
+\textbf{Weak residual formulation.} The exact computation of the residual $\residual$ involves costly higher-order derivatives, especially the divergence term $\Div_\x(\nabla_\x \log \nnetprob)$ can be challenging to compute for high-dimensional data. To reduce this overhead, we introduce a series of approximations and adopt a residual in the weak formulation \citep{guo2022fieldflows} such that
+\begin{equation}
+    \approxresidual(\x,\t)=E_{\randv}\left[\residual(\x+\randv,\t)\right]
+    \label{eq:weak-residual}
+\end{equation}
+with $\randv \sim \cN(0, \sigma^2 I)$ and a small $\sigma > 0$. As $\sigma$ approaches $0$, $\approxresidual(\x,\t)$ will be equal to $\residual(\x,\t)$.
+
+\begin{mymath}
+\begin{theorem}
+Using the weak residual formulation, $\approxresidual (\x, \t)$ can be estimated by the following unbiased estimator, which only requires the computation of first-order derivatives
+\begin{align}
+\approxresidual(\x, \t ; \randv) = & \frac{1}{2} \g^2(\t) \left[   \left(\frac{\randv}{\sigma}\right)^{\top} \frac{\score(\x + \randv, \t) - \score(\x - \randv, \t)}{2 \sigma} + \left\Vert\score(\x + \randv, \t)\right\Vert^2_2 \right] \\\nonumber
+&
+ - \langle \f(\x + \randv, \t), \score(\x + \randv, \t) \rangle - \Div_\x(\f(\x + v,\t)) - \partial_\t \log \nnetprob_\t (\x + \randv), 
+\end{align}
+where $\score = \nabla_\x \log \nnetprob$. 
+This yields an unbiased estimator of the squared residual
+\begin{equation}
+    \left\Vert \approxresidual(\x,\t)\right\Vert ^{2}_2 \approx \approxresidual(\x,\t;\randv)\cdot\approxresidual(\x,\t;\randv'),
+\end{equation}
+with $\randv, \randv' \sim \cN(0, \sigma^2 I)$. This estimator can be used in the regularization loss $\fploss$. 
+\label{thm:weak-residual}
+\end{theorem}
+\begin{proof}
+    See \cref{appx:residual-term}.
+\end{proof}
+\end{mymath}
+
+We further reduce computational cost by estimating $\partial_\t \log \nnetprob_\t$ using finite differences \citep{fornberg1988}
+\begin{equation}
+    \partial_\t \log \nnetprob_\t \approx \frac{h_s^2 \log \nnetprob_\t (\x, \t + h_d) + (h_d^2 - h_s^2) \log \nnetprob_\t (\x, \t) - h_d^2 \log \nnetprob_\t (\x, \t - h_s) }{h_s h_d (h_s + h_d)} .
+    \label{eq:finite-difference}
+\end{equation}
+Since both $\t$ and $\log \nnetprob_\t$ are one-dimensional, finite differences serve as a robust estimate. In combination with \cref{thm:weak-residual}, this allows for efficient approximation of the loss $\fploss$.
+
+\subsection{Physically Consistent Model Design}
+To model physical systems accurately and support Fokker-Planck regularization, we must enforce known physical constraints through an appropriate parameterization and choice of architecture.
+
+\textbf{Conservative model parameterization.}
+Diffusion models commonly parameterize the score $\score = NNET(\x, \t)$ directly, whereas an energy-based parameterization of the score $\nabla_\x \log \nnetprob_\t = \nabla_x NNET(\x, \t)$ requires differentiation during the forward pass. While an energy-based formulation has been explored previously \citep{song2019generative}, nowadays it is less common in practice \citep{du2023recycle}, as most applications require only the score and there is no practical difference in sampling quality \citep{salimans2021escore}. 
+However, for \gls{MD} simulations, the conservative property provided by the energy-based parameterization is crucial, since it stabilizes the simulation \citep{arts2023}, as demonstrated in \cref{appx:conservative-vs-score}. This means that access to $\nabla_\x \log \prob_\t$ needed for computing $\fploss$ introduces no additional computational overhead beyond what is already needed for \gls{MD}.
+
+\textbf{Architecture.}
+Our choice for the score is conservative, translation invariant, and learns $SO(3)$ equivariance. Similarly to \cite{arts2023}, we use a graph transformer \citep{shi2021}, making the score permutation equivariant and achieving translation invariance by using pairwise distances instead of absolute coordinates. For the rotation equivariance, recent high-profile work \citep{abramson2024alphafold3} has shown that the architecture itself does not necessarily need to enforce this property. Hence, we opted to apply random rotations during training so that the network learns rotational equivariance via data augmentation. 
+
+The main part of the architecture can be summarized by describing the nodes $\bn$ and edges $\be$ such that
+\begin{align}
+    &\be_{ij} = \x_i - \x_j \,,  \qquad
+    \bn^{(0)}_i = [\ba_i, \t] \,,  \qquad
+    \bn^{(l+1)} = \phi^{(l)}(\bn^{(l)}, \be) ,
+\end{align}
+where $\x$ are the coarse-grained positions, $\be$ are the edge features, $\ba$ are atom features, $\t$ is the diffusion time, $\bn^{(l)}$ are the node embeddings of layer $l$, and $\phi$ is one layer of the graph transformer. When training on a single molecule, we use one-hot atom types; for the transferable model, we use: atom identity, atom number, residue index, and amino acid type following \cite{klein2024tbg}.
+
+Finally, to achieve conservativeness, we map the last node embeddings $\bn^{(L)}_i \in \bbR^K$ to scalar energies via $\psi: \bbR^K \to \bbR$, and compute the score as $\nabla_\x \sum_i \psi(\bn^{(L)}_i)$. Overall, this yields a translation-invariant, approximately rotation-equivariant, conservative architecture that also avoids issues caused by mirror symmetries \citep{trippe2023diffusion, klein2024tbg}.
+
+\subsection{Mixture of Experts}
+Using conservative models and Fokker-Planck regularization introduces computational overhead, especially during training. We will show in \cref{sec:experiments}, that, particularly at large diffusion times $\t$, this precision is unnecessary. To address this, we adopt a time-based \gls{MoE} approach to allocate model capacity more efficiently and further improve model consistency.
+
+Instead of training a single model for all $\t \in (0, 1)$, we partition the interval into disjoint subintervals $\cI_0, \cI_1, \dots$ with $\bigcup_i \cI_i = (0, 1)$, and assign a separate expert $\scorei{i}$ to each interval. The overall score is
+\begin{equation}
+    \score(\x, \t) = \sum_i w_i(\t) \scorei{i}(\x, \t) \,, \quad \text{such that} \quad \forall \t: \sum_i w_i(\t) = 1,
+\end{equation}
+where $w(\t) \in [0, 1]$ is a time-dependent gating function that selects the current active model. Similar ideas have been explored in the image domain to fine-tune models and improve sampling performance \citep{balaji2023ediffi, ganjdanesh2025mixture}. In our setup, only one model is active at a given $\t$, simplifying memory and compute requirements and allowing all models to be trained in parallel.
+Although training each model independently from the others induces discontinuities at the boundaries where two models switch, we observe no significant drawbacks in practice.
+
+This scheme has two main advantages:
+First of all, our experiments reveal that introducing the loss from \cref{eq:fp-training} to the whole model can lead to overregularization at larger timescales, degrading iid sampling performance. This suggests that models for large $\t$ do not require Fokker-Planck regularization (and no conservative parameterization) to be accurate. By using simpler unconstrained models for larger timescales, we can improve performance while preventing overregularization. 
+Further, as each expert specializes on a subinterval of $\t$, it can focus its capacity accordingly. Experts for small $\t$ handle fine-grained structure, while those at large $\t$ model coarse features \citep{ganjdanesh2025mixture}. As this makes the structures each model sees more similar, \gls{MoE} can further stabilize and improve simulation results, even when keeping the overall number of parameters fixed.

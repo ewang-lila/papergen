@@ -1,0 +1,51 @@
+\section{Background}
+
+\subsection{Generative Score-based Modeling}
+\textbf{Diffusion models} \citep{song2019generative, ho2020diffusion, song2021} are self-supervised generative models that gradually corrupt the training data with noise and learn to reverse this stochastic process. The forward process is typically defined by a \gls{SDE}
+\begin{equation}
+    \d{\x} = \f(\x, t)\d{t} + \g(t)\d{\bw} ,
+    \label{eq:forward-diffusion}
+\end{equation}
+where $\bw$ denotes the standard Wiener process, and $\f$ and $\g$ define the drift and diffusion coefficient respectively. To generate samples, diffusion models simulate the corresponding reverse-time \gls{SDE}
+\begin{equation}
+    \d{\x} = \left[ \f(\x, \t) - \g^2(\t) \nabla_\x \log \prob_\t (\x) \right] \d{\t} + \g(\t)\d{\bar{\bw}} ,
+\end{equation}
+starting from Gaussian noise at time $\t=1$, they iteratively denoise until a sample is produced at $\t=0$. Here, $\prob_\t (\x)$ denotes the density of $\x$ at time $\t$, which the model aims to approximate. $\bar{\bw}$ denotes the time-reversed Wiener process. 
+
+As for $\f$ and $\g$, the choice depends on the specific diffusion formulation. In this work, we adopt the \gls{VP} SDE formulation introduced by  \cite{song2021}.
+
+\textbf{Denoising score matching.} Diffusion models are typically trained using denoising score matching \citep{vincent2011, song2021}, which minimizes the squared error between a time-dependent learned score function $\score(\x(\t), \t)$ and the true score of the transition kernel $\prob_{0\t}(\x(\t) \cond \x(0))$ conditioned on the training data $\x(0)$
+\begin{equation}
+    \params^* = \argmin_{\params} \E_{\t \sim \mathcal{U}(0, 1)} \E_{\x(0)} \E_{\x(t) \cond \x(0)} \left[ \lambda(\t) \left\Vert \score (\x(\t), \t) - \nabla_{\x(\t)} \log \prob_{0\t}(\x(\t) \cond \x(0)) \right\Vert^2_2 \right],
+    \label{eq:diffusion-optimization}
+\end{equation}
+where $\lambda(t)$ is a time-dependent weighting function. For brevity, we will denote the denoising diffusion loss as $\dsmloss[\score](\x, \t) = \lambda(\t) \left\Vert \score (\x(\t), \t) - \nabla_{\x(\t)} \log \prob_{0\t}(\x(\t) \cond \x(0)) \right\Vert^2_2$. 
+
+
+\textbf{Parameterization and instabilities.} With an affine drift $\f$, we can write the closed-form solution of $\prob_{0\t}$ as a Gaussian \citep{saarka2019}, and can efficiently evaluate the loss with
+\begin{equation}
+    \params^* = \argmin_{\params} \E_{\t \sim \mathcal{U}(0, 1)} \E_{\x(0)} \E_{\epsilon \sim \cN(0, I)} \left[ \lambda(\t) \left\Vert \score (\mu(\x(0), \t) + \sigma(t) \epsilon, \t) + \frac{\epsilon}{\sigma(t)} \right\Vert^2_2 \right],
+\end{equation}
+where $\mu(\x(0), \t), \sigma(\t)$ depend on the concrete choices for $\f$ and $\g$. By construction, $\sigma(0) = 0$, ensuring interpolation between data and noise. Minimizing the denoising loss yields an approximation of the unconditional score $\score (\x, \t) \approx \nabla_x \log \prob_\t (\x)$. Details on the concrete choices for this formulation can be found in \cref{appx:vp-diffusion}.
+
+As $\t \rightarrow 0$, this parameterization introduces numerical instability, where $\sigma(\t)$ vanishes and the loss explodes. This instability makes training difficult at small timescales \citep{kim2022softtruncation} and is typically mitigated by truncating the training interval to $(\varepsilon, 1)$ for some $\varepsilon > 0$. While effective for training stability, this inherent instability in training limits the model's accuracy at small $\t$, which is critical for applications requiring reliable scores close to the data manifold, as targeted in this work. 
+
+\subsection{Boltzmann Distribution}
+\textbf{Langevin simulation.} Samples from the \emph{Boltzmann distribution} of molecular systems are typically generated using \gls{MD} simulations. A common approach is to simulate Langevin dynamics \citep{leimkuhler2015md}, which corresponds to integrating the following set of \glspl{SDE}
+\begin{align} 
+   \d{\x} &= \bv \d{\t} \,,  \qquad \bM \d{\bv} = - \nabla_\x \potential(\x) \d{t} - \gamma \bM \bv \d{t} + \sqrt{2 \gamma k_B T} \d{\bw_\t}.
+   \label{eq:langevin}
+\end{align}
+$\bM$ denotes the particle masses, $\bv$ the velocities, $\gamma$ is a friction constant, $k_BT$ a constant, and $\bw_\t$ is the standard Brownian motion. Note that $\t$ here refers to the physical time instead of the diffusion time used earlier. Integration of this system requires access to the forces $- \nabla_\x \potential$. However, in settings where direct force evaluation is not feasible, such as in \gls{CG} models, a surrogate force function is required. In this work, we propose using the score $\score(\x, \t=0)$ for this purpose, as we describe next.
+
+\textbf{Extracting forces.} After performing a long-running \gls{MD} simulation, the samples are distributed according to the Boltzmann distribution \citep{boltzmann1868studien} such that $\prob(\x) = \exp ( -\frac{\potential(\x)}{k_BT} ) / Z$, with an underlying potential $\potential$ and a normalization constant $Z$. Training a diffusion model on this data establishes the following relation at $t=0$
+\begin{align} \label{eq:score-equals-forces}
+    \score (\x, \t=0) & \approx \nabla_x \log \prob_{\t=0} (\x) \\\nonumber
+    & = \nabla_x \log \exp \left( -\frac{\potential (\x)}{k_BT} \right) - \nabla_\x \log Z \\\nonumber
+    & = - \nabla_x \frac{\potential (\x)}{k_BT} - 0.
+\end{align}
+This reveals that the score is proportional to $-\nabla_\x \potential(\x)$, the forces acting on the system. Intuitively, this means that as the diffusion process gets closer to the data, the sampling becomes more \enquote{physical}.
+Importantly, this equivalence shows that any diffusion model trained on Boltzmann-distributed data can be used not only for independent sampling but also for simulating molecular dynamics by leveraging the learned score as a force estimator and the \glspl{SDE} from \cref{eq:langevin}.
+
+Unlike prior works that require explicit force labels for training \citep{husic2020coarse, durumeric2023machine, charron2023navigating,kramer2023statistically}, this observation allows us to learn a model directly from equilibrium samples.
+This is particularly useful for systems where force labels are unavailable. 

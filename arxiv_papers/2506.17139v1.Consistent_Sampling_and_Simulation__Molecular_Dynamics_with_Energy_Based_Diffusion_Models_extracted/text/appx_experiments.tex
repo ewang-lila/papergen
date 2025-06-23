@@ -1,0 +1,833 @@
+\section{Ablation Studies and More Experiments}
+
+\subsection{Müller-Brown Potential} \label{appx:mueller-brown}
+We would like to complement \cref{fig:mueller-brown} from the main paper with numerical values. We have used the same metrics as for the other experiments and illustrate the results in \cref{tab:mueller-brown-jsd}.
+
+\begin{table}[h]
+\centering
+\scalebox{0.8}{
+\begin{tabular}{l c c c c }
+\toprule
+\textbf{Method} & \textbf{iid JS ($\downarrow$)} & \textbf{sim JS ($\downarrow$)} & \textbf{iid PMF ($\downarrow$)} & \textbf{sim PMF ($\downarrow$)} \\\midrule
+Reference    & \multicolumn{2}{c}{0.0119 $\pm$ 0.0004} & \multicolumn{2}{c}{0.087 $\pm$ 0.002} \\\midrule
+Diffusion       & \textbf{0.0122 $\pm$ 0.0013} & 0.0448 $\pm$ 0.0125 & 0.111 $\pm$ 0.006 & 0.504 $\pm$ 0.150 \\ \midrule
+Mixture            &  \textbf{0.0109 $\pm$ 0.0007} &  0.0254 $\pm$ 0.0109 &  \textbf{0.097 $\pm$ 0.004} & 0.247 $\pm$ 0.113 \\
+Fokker-Planck   & 0.0130 $\pm$  0.0010 & 0.0166 $\pm$ 0.0009 & 0.122 $\pm$ 0.006 & 0.163 $\pm$ 0.008 \\
+Both         & \textbf{0.0110 $\pm$  0.0007} &  \textbf{0.0108 $\pm$ 0.0008} &  \textbf{0.098 $\pm$ 0.003} & \textbf{0.099 $\pm$ 0.004} \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.2cm}
+\caption{Comparison of methods based on \gls{JS} Divergence and the \gls{PMF} error. Lower values are better. To compute the standard deviation, we have trained ten different models and performed sampling/simulation with them. As for the reference, we have started multiple simulations with a different seed on the same ground-truth potential. This serves as a reference of what could optimally be achieved.}
+\label{tab:mueller-brown-jsd}
+\end{table}
+
+\subsection{Comparing Conservative and Score-based Models} \label{appx:conservative-vs-score}
+Previous work \citep{arts2023} suggested that conservative models improve the quality of the diffusion process. However, this effect was not observed for image data \citep{salimans2021escore}. In \cref{fig:conservative-vs-score}, we compare these approaches in practice. For iid sampling, conservative models provide a slight improvement. In contrast, for simulation, we were unable to train stable score-based models without a conservative parameterization. Using a conservative model yields much more stable forces, making simulation feasible. We attribute this to the smoother behavior of the conservative parameterization, which prevents sudden changes in the score. Since the impact on iid sampling is negligible, we consider the conservative parameterization most relevant for small timescales, where model training is more sensitive. Consequently, in our \gls{MoE} architecture, we apply the conservative parameterization only to the small-time diffusion model, achieving comparable or even superior iid sampling performance.
+
+\begin{figure}[h]
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/baseline_score_iid_phi_psi}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/baseline_iid_phi_psi}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/baseline_score_langevin_phi_psi}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/baseline_langevin_phi_psi}
+        \end{subfigure}
+    \end{minipage}
+    \caption{We compare a conservative diffusion model with a score-based model. We can see that around the low-density regions, the conservative parameterization generates better iid samples. As for simulation, a score-based model exhibits stability issues, and the simulation becomes unstable after a few thousand steps.}
+    \label{fig:conservative-vs-score}
+\end{figure}
+
+
+\subsection{Runtime Comparison} \label{appx:runtime}
+We compare the runtime of different approaches for training and inference in \cref{tab:runtime}. Note that the \gls{MoE} training could be parallelized. However, our current implementation is not optimized and does not distribute any training. In some cases, it even introduces overhead due to unoptimized implementation. Hence, we only see performance speedup for larger systems.
+
+\begin{table}[h]
+    \centering
+    \scalebox{0.8}{
+    \begin{tabular}{l l| c c c c }
+        \toprule
+        \textbf{Dataset} & \textbf{Task} & \textbf{Diffusion} & \textbf{Mixture} & \textbf{Fokker-Planck} & \textbf{Both} \\\midrule
+         Alanine Dipeptide & Train & 49min & 50min & 4h 39min & 3h 59min \\
+         Alanine Dipeptide & Inference  & 3min & 4min & 3min & 4min \\\midrule
+         Minipeptide & Train  & 4h 5min & 3h 50min & 28h 39min & 27h 5min \\
+         Minipeptide & Inference & 8 min & 4min & 8min & 4min \\ 
+         \bottomrule
+    \end{tabular}
+    }
+    \vspace{0.2cm}
+    \caption{We report the training and inference time for the different models.}
+    \label{tab:runtime}
+\end{table}
+
+\subsection{Alanine Dipeptide} \label{appx:aldp-bonds}
+In this section, we report some further results and plots on alanine dipeptide. In \cref{fig:aldp-fp-error} the Fokker-Planck residual error $\left\Vert \cF_{\nnetprob}(\x, \t) - \partial_\t \log \nnetprob_\t(\x)\right\Vert_2$ is reported. Overall, the results are similar to what was reported in \cref{fig:minipeptide-fp-error}. However, we can note that the Fokker-Planck error of \emph{Mixture} is lower than \emph{Diffusion}, indicating that \gls{MoE} can improve the model's consistency.
+
+In \cref{fig:aldp-phi-psi-free-energy} we compare the free energies along the dihedral angles $\varphi, \psi$ for iid sampling and simulation. We can see that the results from the main paper persist and that \emph{Both} also shows the best performance for iid sampling. 
+
+\cref{fig:aldp-cn-bond} shows all bond lengths of the coarse-grained molecule for iid sampling and Langevin simulation. Since \emph{Two For One} does not evaluate the model at $\t=0$ it introduces noise across all bonds. We can also see this behavior by looking at the Wasserstein distance of the bond-lengths to the reference data as seen in \cref{tab:aldp-w1-distances}.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.4\linewidth]{figures/aldp/scalar_fp_error}
+    \caption{Comparing the Fokker-Planck error for $\log \nnetprob$ of multiple models. This figure shows the results for alanine dipeptide.}
+    \label{fig:aldp-fp-error}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/iid_phi_free_energy}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/iid_psi_free_energy}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/langevin_phi_free_energy}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/langevin_psi_free_energy}
+        \end{subfigure}
+    \end{minipage}
+    \caption{Comparing the free energy of alanine dipeptide along the dihedral angles $\varphi, \psi$ for iid sampling and simulation across different models.}
+    \label{fig:aldp-phi-psi-free-energy}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/iid_bond_lengths_0}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/iid_bond_lengths_1}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/iid_bond_lengths_2}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/iid_bond_lengths_3}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/langevin_bond_lengths_0}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/langevin_bond_lengths_1}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/langevin_bond_lengths_2}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/aldp/langevin_bond_lengths_3}
+        \end{subfigure}
+    \end{minipage}
+    \caption{This illustration shows the sampled bond lengths for the molecule alanine dipeptide. }
+\end{figure}
+
+
+\begin{table}[h]
+\centering
+\scalebox{0.6}{
+\begin{tabular}{l c c}
+\toprule
+\textbf{Method} & \textbf{iid relative W1 ($\downarrow$)} & \textbf{sim relative W1 ($\downarrow$)} \\\midrule
+Diffusion       & \textbf{1.51 $\pm$ 1.28} & 1.70 $\pm$ 0.38 \\
+Two For One     & \textbf{0.96 $\pm$ 0.34} & 48.92 $\pm$ 11.25 \\\midrule
+Mixture         & 1.36 $\pm$ 0.21 & \textbf{0.94 $\pm$ 0.21} \\
+Fokker-Planck   & 2.05 $\pm$ 0.62 & 2.51 $\pm$ 0.59 \\
+Both            & \textbf{1.00 $\pm$ 0.00} & \textbf{1.00 $\pm$ 0.00} \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.2cm}
+\caption{Comparison of methods based on the Wasserstein 1 distance of the C-N bond lengths to the reference data. Lower values are better. We have divided all entries by the Wasserstein 1 distance of \emph{Both} so that the numbers are easier to compare. In other words, numbers larger than 1 mean that the bonds are worse than \emph{Both}. }
+\label{tab:aldp-w1-distances}
+\end{table}
+
+\subsubsection{Alanine-Cysteine (AC)} \label{appx:minpeptide-ac-more-metrics}
+In \cref{fig:minipeptide-ac-more-metrics} we present extended results for the dipeptide investigated in the main part of the paper (AC). We can see that the results are consistent with what we presented and also the free energy surfaces on $\psi$ improve with Fokker-Planck regularization. 
+
+\begin{figure}
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/AC/iid_ca_distance.pdf}            
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/AC/iid_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/AC/iid_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/AC/langevin_ca_distance.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/AC/langevin_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/AC/langevin_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{AC:} We compare further metrics between iid sampling and Langevin simulation. We compare the $C_\alpha$--$C_\alpha$ distance for the dipeptides and also the free energy projections along the dihedral angles $\varphi, \psi$.}
+    \label{fig:minipeptide-ac-more-metrics}
+\end{figure}
+
+\subsection{Transferability: Results on More Dipeptides} \label{appx:results-on-more-dipeptides}
+In this section, we depict more dipeptides from the test set and demonstrate their performance. While the results are slightly different for each system, the general trends are consistent. We present the following dipeptides: KS \cref{fig:minipeptide-ks,fig:minipeptide-ks-more-metrics}, HP \cref{fig:minipeptide-hp,fig:minipeptide-hp-more-metrics}, NY \cref{fig:minipeptide-ny,fig:minipeptide-ny-more-metrics}, TD \cref{fig:minipeptide-td,fig:minipeptide-td-more-metrics}, and RV \cref{fig:minipeptide-rv,fig:minipeptide-rv-more-metrics}.
+
+\begin{figure}
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+        \vspace{-0.2cm}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/reference_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/tbg_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/two_for_one_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/mixture_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/fp_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/both_iid_phi_psi.pdf}         
+        \end{subfigure}
+    \end{minipage}
+
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+            \vspace{-0.2cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/reference_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/baseline_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/two_for_one_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/mixture_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/fp_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/both_langevin_phi_psi.pdf}            
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{KS:} We compare the free energy plot on the dihedral angles $\varphi, \psi$ for all presented methods for iid sampling and Langevin simulation.}
+    \label{fig:minipeptide-ks}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/iid_ca_distance.pdf}            
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/iid_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/iid_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/langevin_ca_distance.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/langevin_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/KS/langevin_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{KS:} We compare further metrics between iid sampling and Langevin simulation. We compare the $C_\alpha$--$C_\alpha$ distance for the dipeptides and also the free energy projections along the dihedral angles $\varphi, \psi$.}
+    \label{fig:minipeptide-ks-more-metrics}
+\end{figure}
+
+\begin{figure}
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+        \vspace{-0.2cm}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/reference_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/tbg_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/two_for_one_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/mixture_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/fp_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/both_iid_phi_psi.pdf}         
+        \end{subfigure}
+    \end{minipage}
+
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+            \vspace{-0.2cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/reference_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/baseline_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/two_for_one_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/mixture_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/fp_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/both_langevin_phi_psi.pdf}            
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{HP:} We compare the free energy plot on the dihedral angles $\varphi, \psi$ for all presented methods for iid sampling and Langevin simulation.}
+    \label{fig:minipeptide-hp}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/iid_ca_distance.pdf}            
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/iid_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/iid_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/langevin_ca_distance.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/langevin_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/HP/langevin_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{HP:} We compare further metrics between iid sampling and Langevin simulation. We compare the $C_\alpha$--$C_\alpha$ distance for the dipeptides and also the free energy projections along the dihedral angles $\varphi, \psi$.}
+    \label{fig:minipeptide-hp-more-metrics}
+\end{figure}
+
+\begin{figure}
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+        \vspace{-0.2cm}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/reference_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/tbg_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/two_for_one_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/mixture_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/fp_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/both_iid_phi_psi.pdf}         
+        \end{subfigure}
+    \end{minipage}
+
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+            \vspace{-0.2cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/reference_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/baseline_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/two_for_one_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/mixture_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/fp_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/both_langevin_phi_psi.pdf}            
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{NY:} We compare the free energy plot on the dihedral angles $\varphi, \psi$ for all presented methods for iid sampling and Langevin simulation.}
+    \label{fig:minipeptide-ny}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/iid_ca_distance.pdf}            
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/iid_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/iid_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/langevin_ca_distance.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/langevin_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/NY/langevin_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{NY:} We compare further metrics between iid sampling and Langevin simulation. We compare the $C_\alpha$--$C_\alpha$ distance for the dipeptides and also the free energy projections along the dihedral angles $\varphi, \psi$.}
+    \label{fig:minipeptide-ny-more-metrics}
+\end{figure}
+
+\begin{figure}
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+        \vspace{-0.2cm}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/reference_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/tbg_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/two_for_one_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/mixture_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/fp_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/both_iid_phi_psi.pdf}         
+        \end{subfigure}
+    \end{minipage}
+
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+            \vspace{-0.2cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/reference_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/baseline_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/two_for_one_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/mixture_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/fp_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/both_langevin_phi_psi.pdf}            
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{TD:} We compare the free energy plot on the dihedral angles $\varphi, \psi$ for all presented methods for iid sampling and Langevin simulation.}
+    \label{fig:minipeptide-td}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/iid_ca_distance.pdf}            
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/iid_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/iid_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/langevin_ca_distance.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/langevin_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/TD/langevin_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{TD:} We compare further metrics between iid sampling and Langevin simulation. We compare the $C_\alpha$--$C_\alpha$ distance for the dipeptides and also the free energy projections along the dihedral angles $\varphi, \psi$.}
+    \label{fig:minipeptide-td-more-metrics}
+\end{figure}
+
+\begin{figure}
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+        \vspace{-0.2cm}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/reference_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/tbg_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/two_for_one_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/mixture_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/fp_iid_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/both_iid_phi_psi.pdf}         
+        \end{subfigure}
+    \end{minipage}
+
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.05\textwidth}
+            \vspace{-0.2cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/reference_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/baseline_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/two_for_one_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/mixture_langevin_phi_psi.pdf}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/fp_langevin_phi_psi.pdf}            
+        \end{subfigure}
+        \begin{subfigure}[c]{0.15\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/both_langevin_phi_psi.pdf}            
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{RV:} We compare the free energy plot on the dihedral angles $\varphi, \psi$ for all presented methods for iid sampling and Langevin simulation.}
+    \label{fig:minipeptide-rv}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/iid_ca_distance.pdf}            
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/iid_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/iid_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \vspace{0.5cm}
+    \begin{minipage}{\textwidth}
+        \centering
+        \begin{subfigure}[c]{0.08\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/langevin_ca_distance.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/langevin_phi_free_energy.pdf}
+        \end{subfigure}
+        \hspace{0.5cm}
+        \begin{subfigure}[c]{0.2\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/minipeptide/RV/langevin_psi_free_energy.pdf}
+        \end{subfigure}
+    \end{minipage}
+    \caption{\textbf{RV:} We compare further metrics between iid sampling and Langevin simulation. We compare the $C_\alpha$--$C_\alpha$ distance for the dipeptides and also the free energy projections along the dihedral angles $\varphi, \psi$.}
+    \label{fig:minipeptide-rv-more-metrics}
+\end{figure}

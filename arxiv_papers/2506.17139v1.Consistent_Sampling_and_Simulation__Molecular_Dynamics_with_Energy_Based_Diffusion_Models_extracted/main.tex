@@ -1,0 +1,103 @@
+\documentclass{article}
+\usepackage[preprint]{neurips_2025}
+%     \usepackage[preprint]{neurips_2025}
+%     \usepackage[final]{neurips_2025}
+
+\newcommand{\myurl}[1]{\href{#1}{#1}}
+\def\ourCode{\href{https://github.com/noegroup/ScoreMD}{\texttt{https://github.com/noegroup/ScoreMD}}}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{empheq}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+
+\definecolor{cite_color}{HTML}{114083}
+\definecolor{url_color}{RGB}{153, 102,  0}
+\hypersetup{
+ colorlinks = true,
+ citecolor = cite_color,
+ linkcolor = url_color,
+ urlcolor = black
+}
+
+\usepackage[theorems,most]{tcolorbox}
+\newtcolorbox{mymath}[1][]{%
+    nobeforeafter,  tcbox raise base,
+    colframe=white!30!black,
+    % replace this line both here and below if you don't like
+    colback=olive!3,
+    %colback=white!30, 
+    boxrule=0.2mm,
+    boxsep=5pt,
+    #1}
+
+\input{preamble}
+\input{macros}
+\input{acronyms}
+
+\title{Consistent Sampling and Simulation: Molecular Dynamics with Energy-Based Diffusion Models}
+
+\author{
+  Michael Plainer~$^{1,2,3,4}$\\
+  \texttt{michael.plainer@fu-berlin.de}
+  \\
+  \And Hao Wu~$^{5}$ \\
+  \texttt{hwu81@sjtu.edu.cn}
+  \AND Leon Klein~$^{1}$%
+  \And Stephan Günnemann~$^{6}$
+  \And Frank Noé~$^{1,7,8}$
+  \AND \textnormal{
+  $^{1}$Freie Universität Berlin \quad
+  $^{2}$Zuse School ELIZA \quad
+  $^{3}$Technische Universität Berlin
+  } \\
+  \textnormal{
+  $^{4}$Berlin Institute for the Foundations of Learning and Data
+  $^{5}$Shanghai Jiao Tong University \quad
+  } \\
+  \textnormal{
+  $^{6}$Technische Universität München \quad
+  $^{7}$Rice University \quad
+  $^{8}$Microsoft Research AI4Science \quad
+  }
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    Diffusion models have recently gained significant attention due to their effectiveness in various scientific domains, including biochemistry. When trained on equilibrium molecular distributions, diffusion models provide both: a generative procedure to sample equilibrium conformations and associated forces derived from the model's scores. However, using the forces for coarse-grained molecular dynamics simulations uncovers inconsistencies in the samples generated via classical diffusion inference and simulation, despite both originating from the same model. Particularly at the small diffusion timesteps required for simulations, diffusion models fail to satisfy the Fokker-Planck equation, which governs how the score should evolve over time. We interpret this deviation as an indication of the observed inconsistencies and propose an energy-based diffusion model with a Fokker-Planck-derived regularization term enforcing consistency. We demonstrate the effectiveness of our approach on toy systems, alanine dipeptide, and introduce a state-of-the-art transferable Boltzmann emulator for dipeptides that supports simulation and demonstrates enhanced consistency and efficient sampling.
+\end{abstract} 
+
+\input{text/intro}
+\input{text/background}
+\input{text/method}
+\input{text/related_work}
+\input{text/experiments}
+\input{text/conclusion}
+\input{text/acknowledgements}
+
+\bibliographystyle{apalike}
+\bibliography{refs}
+
+\clearpage
+\appendix
+
+\input{text/appx_proofs}
+\input{text/appx_experiment_details}
+\input{text/appx_experiments}
+\input{text/impact}
+
+%\clearpage
+%\input{text/checklist}
+
+\end{document}

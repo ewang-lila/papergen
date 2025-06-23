@@ -1,0 +1,57 @@
+\section{Proofs, Derivations, and Mathematical Details} \label{appx:proofs}
+\subsection{Diffusion} \label{appx:vp-diffusion}
+We have opted to use \gls{VP} diffusion \citep{song2021} throughout the paper, as such the drift and diffusion can be written as
+\begin{equation}
+    \f(\x, \t) = - \frac{1}{2} \beta(\t) \x, \quad \g(\t) = \sqrt{\beta(\t)} ,
+\end{equation}
+where 
+\begin{equation}
+    \beta(\t) = \beta_\text{min} + \t \cdot (\beta_\text{max} - \beta_\text{min}),
+\end{equation}
+with the hyperparameters from \cite{song2021} such that $(\beta_\text{min}, \beta_\text{max})=(0.1, 20)$. For this noise schedule to be suitable for molecules, it is important that we normalize the data to have unit variance.
+
+With this specific choice for $\f$ and $\g$, we can write the transition kernel as a Gaussian \citep{saarka2019} with a moving mean and standard deviation such that
+\begin{align}
+    \prob_{\t}(\x(\t) \cond \x(0)) &= \mathcal{N} (\x(\t); \mu(\x(0), \t), \sigma(\t) I ) \\
+    &= \mathcal{N} (\x(\t); e^{-\frac{1}{2} \int_{0}^{t} \beta(s) ds} \x(0), (1 - e^{-\int_{0}^{t} \beta(s) ds}) I).
+\end{align}
+
+\subsection{Residual Loss} \label{appx:residual-term}
+In this section, we prove \cref{thm:weak-residual} and show that $\approxresidual(\x, \t; \randv)$ can be used to get an unbiased estimation of $\approxresidual(\x, \t)$. 
+For simplicity of notation, let us express the log Fokker-Planck equations from \cref{eq:fokker-planck} as 
+\begin{equation}
+\frac{1}{2}\g^{2}(\t)\Div_\x \score(\x,\t)+\gamma_{\params}(\x,\t) = 0, 
+\end{equation}
+where $\score(\x,\t)=\nabla_{\x}\log \nnetprob_t(\x)$, and $\gamma_\params$ involves only the first-order gradient of $\log \nnetprob_t$.
+Here we define the \enquote{weak} residual \citep{guo2022fieldflows} of the above equations for each $(\x, \t)$
+\begin{equation}
+\approxresidual(\x,\t) = \mathbb{E}_{\randv \sim\cN(0,\sigma^2 I)}\left[\frac{1}{2}\g^{2}(\t)\Div_\x \score(\x+\randv,\t)+\gamma_{\params}(\x+\randv,\t)\right],
+\end{equation}
+where $\sigma>0$ is a small number. It can be seen that residuals are zero if the two parts of the equations are exactly equal. We now aim to get the unbiased estimation of the above residual, without calculating high-order derivatives.
+
+As such, we can show that for an arbitrary $t$,
+\begin{eqnarray}
+\mathbb{E}_{\randv}\left[\Div_\x \score(\x+\randv,\t)\right] & = & \int\frac{\exp\left(-\frac{\randv^{\top}\randv}{2\sigma^{2}}\right)}{\left(2\pi\sigma^{2}\right)^{\frac{D}{2}}}\cdot\Div_\x \score(\x+\randv,\t)dv\\
+ & = & -\frac{1}{\left(2\pi\sigma^{2}\right)^{\frac{D}{2}}}\int\left\langle \nabla_{\randv}\exp\left(-\frac{\randv^{\top}\randv}{2\sigma^{2}}\right),\score(\x+\randv,\t)\right\rangle d\randv\\
+ & = & \frac{1}{\left(2\pi\sigma^{2}\right)^{\frac{D}{2}}}\int\exp\left(-\frac{\randv^{\top}\randv}{2\sigma^{2}}\right)\frac{\randv^{\top}}{\sigma^{2}}\score(\x+\randv,\t)dv\\
+ & = & \mathbb{E}_{\randv}\left[\frac{\randv^{\top}\score(\x+\randv, \t)}{\sigma^{2}}\right]\\
+ & = & \frac{1}{2}\mathbb{E}_{\randv}\left[\frac{\randv^{\top}\score(\x+\randv,\t)}{\sigma^{2}}-\frac{\randv^{\top}\score(\x-\randv,\t)}{\sigma^{2}}\right]\\
+ & = & \mathbb{E}_{\randv}\left[\left(\frac{\randv}{\sigma}\right)^{\top}\frac{\score(\x+\randv,\t)-\score(\x-\randv,\t)}{2\sigma}\right],
+\end{eqnarray}
+where $\x \in \bbR^D, \randv \in \bbR^D$ and $t \in \bbR$.
+
+Based on this, we can obtain
+\begin{align}
+    \approxresidual(\x,\t) &= \mathbb{E}_{\randv}\left[ \approxresidual(\x, \t; \randv) \right] \\
+    &= \mathbb{E}_{\randv}\left[ \frac{1}{2}\g^{2}(\t) \left(\frac{\randv}{\sigma}\right)^{\top}\frac{\score(\x+\randv,\t)-\score(\x-\randv,\t)}{2\sigma}  +\frac{\gamma_{\theta}(\x+\randv,\t)+\gamma_\params(\x-\randv,\t)}{2} \right].
+\end{align}
+Hence, $\approxresidual(\x,\t;\randv)$ is an unbiased estimation of $\approxresidual(\x,\t)$ by drawing a single sample $\randv \sim\cN(0,\sigma^2 I)$.
+
+In practice, we can further reduce the computational overhead by only using a single approximation for $\gamma_\params$, and defining
+\begin{equation}
+\approxresidual(\x,\t;\randv) = \frac{1}{2}\g^{2}(\t) \left(\frac{\randv}{\sigma}\right)^{\top}\frac{\score(\x+\randv,\t)-\score(\x-\randv,\t)}{2\sigma} +\gamma_\params(\x+\randv,\t).
+\end{equation}
+We found $\sigma=0.0001$ to be an effective choice throughout our experiments.
+
+\subsection{Finite Difference Approximation}
+To approximate $\partial_\t \log \nnetprob$, we relied on a finite difference approximation \cite{fornberg1988}, as stated in \cref{eq:finite-difference}. For this estimation, we have followed the work of \cite{lai2023}, and used the hyperparameters that they suggested $(h_s, h_d) = (0.001, 0.0005)$.

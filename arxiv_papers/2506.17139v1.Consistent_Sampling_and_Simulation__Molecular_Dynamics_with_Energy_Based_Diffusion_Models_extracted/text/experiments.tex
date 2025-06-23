@@ -1,0 +1,194 @@
+\section{Experiments} \label{sec:experiments}
+In this section, we compare sampling for two different settings: classical diffusion sampling (\emph{iid}) and Langevin simulation (\emph{sim}). We consider a model to be consistent when the outputs of these two approaches match. We demonstrate that our approach improves the consistency of diffusion models across several settings. We begin with a two-dimensional toy example---the Müller-Brown potential \citep{muellerbrown1979}---followed by alanine dipeptide, and conclude with a model that generalizes across dipeptides. The code is publicly available at \ourCode{}.
+
+\textbf{Metrics.} We mainly compare the 2D free energy surfaces across different methods. For molecules, we use the dihedral angles $\varphi, \psi$ to reduce the data to two dimensions. We report an approximated \gls{JS} divergence to describe the similarity between the sampled and reference densities. We also report the \gls{PMF} error, which computes the squared distance between the negative logarithms of the samples and the reference, giving more weight to low-density regions \citep{durumeric2024learning}. More details about the metrics can be found in \cref{appx:metrics}.
+
+\textbf{Baselines.} We train a conservative \emph{Diffusion} model and have re-implemented the \emph{Two For One} method \citep{arts2023} using a continuous-time diffusion process to ensure comparability. Both methods use the same architecture, with the only difference being that \emph{Two For One} evaluates at a non-zero diffusion time for simulation. For transferability, we re-train the \emph{Transferable \gls{BG}} model \citep{klein2024tbg} with coarse-graining and compare it without reweighting.
+
+We compare these baselines with three models introduced in this work:
+\emph{Mixture} refers to the \gls{MoE} scheme with three models trained on the intervals $(0, 0.1)$, $[0.1, 0.6)$, and $[0.6, 1.0)$. All models are combined for iid sampling, while only the smallest-timescale model is used for simulation. The models for larger timescales are reduced in size and complexity. \emph{Fokker-Planck} refers to a model where we use the loss from \cref{eq:fp-training} to train a single model. \emph{Both} combines these two approaches with the regularization only applied to the smallest-timescale model.
+
+\subsection{Müller-Brown Potential}
+We first evaluate on the Müller-Brown potential using 100k samples drawn from its Boltzmann distribution in \cref{fig:mueller-brown}. All methods produce iid samples that match the \emph{Reference}. However, when using the learned score for Langevin simulation, the standard \emph{Diffusion} model fails to reproduce the correct distribution and undersamples the low-probability state, highlighting the inconsistency between sampling and simulation. Although having roughly the same number of parameters, the \emph{Mixture} model partially improves this, but consistency is only achieved with \emph{Fokker-Planck} regularization. Combining \emph{Both} approaches further improves performance (also compare \cref{appx:mueller-brown}).
+
+\begin{figure}
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.1\textwidth}
+            \textbf{iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-ground-truth}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-nnet-iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-mixture-iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-fp-iid}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-all-iid}
+        \end{subfigure}
+    \end{minipage}
+
+    \begin{minipage}{\textwidth}
+        \begin{subfigure}[c]{0.1\textwidth}
+            \vspace{-0.5cm}
+            \textbf{sim}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-ground-truth}
+            \caption*{Reference}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-nnet-langevin}
+            \caption*{Diffusion}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-mixture-langevin}
+            \caption*{Mixture}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-fp-langevin}
+            \caption*{Fokker-Planck}
+        \end{subfigure}
+        \begin{subfigure}[c]{0.17\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{figures/mueller-brown-all-langevin}
+            \caption*{Both}
+        \end{subfigure}
+    \end{minipage}
+    \caption{Comparing free energy plots of different models on the Müller-Brown potential for classical diffusion sampling (iid) and Langevin simulation (sim). The energies should align with the training data (Reference).}
+    \label{fig:mueller-brown}
+    \vspace{-0.1cm}
+\end{figure}
+
+
+\subsection{Alanine Dipeptide}
+\textbf{Dataset.} We use 50k samples from an MD simulation of alanine dipeptide in implicit solvent \citep{kohler2021smooth}, coarse-grained to five atoms: [C, N, CA, C, N], as shown in \cref{fig:aldp-inference} (a). When evaluating the models, we perform $1.2\mu s$ of simulations with a $2fs$ timestep, starting from 100 different training conformations and downsample to match the training set size for consistency.
+
+\textbf{Inconsistent sampling.} \cref{fig:aldp-inference} (b) compares the free energies of the sampled dihedral angles for iid sampling and Langevin simulation (sim). While all methods can match the training distribution under iid sampling, simulation quality varies, and existing models show inconsistencies. Standard \emph{Diffusion} fails to recover the low-probability mode (i.e., $\varphi > 0$) completely, even when starting a simulation from these regions. \emph{Mixture} generally improves the results, but still does not find the other mode. This is reflected in the numerical results in \cref{tab:aldp-metrics}, where \emph{Mixture} achieves lower means and smaller variance, but simulation errors remain noticeable. We attribute this behavior to the smaller time range, which focuses the model's attention, allowing it to learn a better, more stable optimum.
+
+\begin{figure}
+    \centering
+    \includegraphics{figures/aldp/aldp}
+    \caption{Comparison of methods on alanine dipeptide. \textbf{(a)} The coarse-graining scheme. \textbf{(b)} Comparison of the Ramachandran plots of different methods for iid sampling and Langevin simulation. \textbf{(c)} The projection of the free energy surface and differences along the dihedral angle $\varphi$ for samples generated with simulation.}
+    \label{fig:aldp-inference}
+\end{figure}
+\begin{figure*}
+\begin{minipage}[c]{.7\textwidth}
+    \vspace{0.0cm}
+    \centering
+    \captionsetup{type=table}            % switch caption type
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{l c c c c}
+    \toprule
+    \textbf{Method} & \textbf{iid JS ($\downarrow$)} & \textbf{sim. JS ($\downarrow$)} & \textbf{iid PMF ($\downarrow$)} & \textbf{sim. PMF ($\downarrow$)} \\\midrule
+    Diffusion       & \textbf{0.0081 $\pm$ 0.0003} & 0.0695 $\pm$ 0.0517 & 0.095 $\pm$ 0.003 & 1.047 $\pm$ 0.924 \\
+    Two For One     & \textbf{0.0081 $\pm$ 0.0003} & 0.0158 $\pm$ 0.0002 & 0.098 $\pm$ 0.006 & 0.206 $\pm$ 0.004 \\\midrule
+    Mixture         & \textbf{0.0080 $\pm$ 0.0004} & 0.0353 $\pm$ 0.0117 & \textbf{0.092 $\pm$ 0.007} & 0.388 $\pm$ 0.109 \\
+    Fokker-Planck   & 0.0084 $\pm$ 0.0002 & \textbf{0.0088 $\pm$ 0.0006} & 0.098 $\pm$ 0.006 & \textbf{0.105 $\pm$ 0.011} \\
+    Both            & \textbf{0.0079 $\pm$ 0.0002} & \textbf{0.0086 $\pm$ 0.0004} & \textbf{0.089 $\pm$ 0.005} & \textbf{0.099 $\pm$ 0.003} \\
+    \bottomrule
+    \end{tabular}
+    }
+    \caption{Comparison of alanine dipeptide with \gls{JS} divergence and \gls{PMF} error. To compute the mean and the standard deviation, we have trained and evaluated three models with three different seeds. Lower values are better.}
+    \label{tab:aldp-metrics}   
+\end{minipage}
+\hspace{0.3cm}
+\begin{minipage}[c]{.25\textwidth}
+    \captionsetup{type=figure} % back to figure
+    \vspace{-0.05cm}
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=0.9\linewidth]{figures/aldp/langevin_bond_lengths_0_slim}
+    \end{subfigure}
+    \vspace{-0.6cm}
+    \caption{C--N bond length in \AA{} for \gls{MD} simulation using different models.}
+    \label{fig:aldp-cn-bond}
+\end{minipage}
+\end{figure*}
+
+
+\textbf{Noisy simulation.} 
+\emph{Two For One} improves consistency by increasing the diffusion time $\t > 0$ where the model is evaluated for simulation. However, this also introduces excessive noise, which degrades structural fidelity. Although iid sampling is not affected by this, the structures produced by Langevin simulation show significant deviations. For example, the W1 distance for the C--N bond is $48.14 \pm 13.03$ larger than for \emph{Both}, as can be seen when inspecting the histogram in \cref{fig:aldp-cn-bond}.
+
+\textbf{Consistent models.} 
+\emph{Fokker-Planck} regularization enables the model to recover the missing states without modifying the diffusion time, and thus preserving structural accuracy. \cref{tab:aldp-metrics} shows that the regularization substantially improves consistency between iid and simulation, although iid performance slightly declines in favor of improved simulation performance. 
+Combining \gls{MoE} with Fokker-Planck regularization for \emph{Both}, enhances simulation quality further while mitigating the drop in iid performance. The resulting model achieves close alignment between iid and simulation, and captures the free energy landscape in simulations accurately (see \cref{fig:aldp-inference} (c)). The superior iid performance of \emph{Both} over \emph{Fokker-Planck} suggests that applying regularization at larger diffusion times may introduce too many constraints on the model and hence degrade generative quality.
+
+\subsection{Transferability Across Dipeptides (two amino acids)}
+\textbf{Dataset.} We use the dataset introduced by \cite{klein2023timewarp} that consists of 49k samples from implicit solvent simulation of $1\mu s$ for all 400 dipeptides (i.e., all possible combinations of the standard 20 amino acids). We have coarse-grained the dipeptides and kept the atoms [N, CA, CB, C, O] for each amino acid, which is a common coarse-grained resolution \citep{charron2023navigating}. With this coarse-graining scheme, up to 10 atoms are retained per molecule, as seen in \cref{fig:minipeptide-inference} (a). In total, we simulate $30ns$ for each dipeptide starting from 10 random conformations and a timestep of $0.5fs$.
+
+\textbf{Overdispersion.} By inspecting the free energy in \cref{fig:minipeptide-inference} (b), we can observe that, again, all models are capable of learning to produce independent samples that resemble the reference distribution. The samples produced by \emph{Transferable \gls{BG}} contain more noise and also sample some unlikely states. While this does not produce statistically significant differences in \cref{tab:minipeptide-ac-metrics}, it produces a higher mean with a similar variance than other methods. Further, note that this model does not support simulation. 
+
+When using the score for simulation, \emph{Two For One} produces broader, overdispersed distributions, as visible in \cref{fig:minipeptide-inference} (b). This overdispersion also affects structural features such as bond and inter-atom distances, consistent with the behavior observed for alanine dipeptide (see \cref{appx:minpeptide-ac-more-metrics}).
+
+\textbf{Advantages of mixture.} 
+For this specific dipeptide, \emph{Both} provides no clear improvement in sampling or simulation over \emph{Fokker-Planck}, which becomes apparent in \cref{fig:minipeptide-inference} (c). However, we have to consider two things: First, \gls{MoE} reduces computational cost by applying training regularization only for small timescales and using simpler models for larger timescales, reducing sampling time by over $50\%$ in this specific case (see \cref{appx:runtime}). And second, for some dipeptides (e.g., NY or RV), \gls{MoE} is essential for consistency (see \cref{appx:results-on-more-dipeptides}), which also results in a significantly lower \gls{JS} divergence and \gls{PMF} error in \cref{tab:minipeptide-ac-metrics}. Also in this case, \gls{MoE} improves the results over \emph{Diffusion}.
+
+
+\textbf{Fokker-Planck error.}
+\cref{fig:minipeptide-fp-error} shows the deviation from the Fokker-Planck equation, quantified as $\left\Vert \cF_{\nnetprob}(\x, \t) - \partial_\t \log \nnetprob_\t(\x)\right\Vert_2$, plotted on a log scale. For models using \gls{MoE}, this error is evaluated only up to $\t = 0.1$, since only the small-timescale model is conservative. Across all methods, the error is highest near $\t = 0$. Applying the Fokker-Planck regularization significantly reduces this error, correlating with the improved sampling-simulation consistency observed earlier.
+
+Interestingly, while \emph{Mixture} improves consistency, its Fokker-Planck error remains comparable to that of unregularized models. This suggests that Fokker-Planck regularization and \gls{MoE} improve consistency through different mechanisms, which explains why combining them outperforms either approach on its own, making \emph{Both} again clearly the best model (compare \cref{tab:minipeptide-ac-metrics}).
+
+
+
+\begin{figure}
+    \centering
+    \includegraphics{figures/minipeptide/minipeptide}
+    \caption{Comparison of methods on testset dipeptide AC. \textbf{(a)} The coarse-graining scheme. \textbf{(b)} Comparison of the Ramachandran plots of different methods for iid sampling and Langevin simulation. \textbf{(c)} The projection of the free energy surface and differences along the dihedral angle $\varphi$ for samples generated with simulation.}
+    \label{fig:minipeptide-inference}
+\end{figure}
+
+
+\begin{figure*}
+\begin{minipage}[c]{.7\textwidth}
+    \vspace{-0.1cm}
+    \centering
+    \captionsetup{type=table}            % switch caption type
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{l c c c c}
+    \toprule
+    \textbf{Method} & \textbf{iid JS ($\downarrow$)} & \textbf{sim. JS ($\downarrow$)} & \textbf{iid PMF ($\downarrow$)} & \textbf{sim. PMF ($\downarrow$)} \\\midrule
+    Transferable BG  & \textbf{0.0183 $\pm$ 0.0070} &  - & \textbf{0.230 $\pm$ 0.119} &  - \\
+    Diffusion        & \textbf{0.0155 $\pm$ 0.0083} & 0.2256 $\pm$ 0.1304 & \textbf{0.206 $\pm$ 0.159} & 6.515 $\pm$ 3.175 \\
+    Two For One      & \textbf{0.0153 $\pm$ 0.0080} & 0.0466 $\pm$ 0.0114 & \textbf{0.203 $\pm$ 0.149} & 0.741 $\pm$ 0.319 \\\midrule
+    Mixture       & \textbf{0.0155 $\pm$ 0.0078} & 0.0444 $\pm$ 0.0237 & \textbf{0.200 $\pm$ 0.127} & 0.658 $\pm$ 0.407 \\
+    Fokker-Planck    & \textbf{0.0154 $\pm$ 0.0060} & \textbf{0.0200 $\pm$ 0.0106} & \textbf{0.192 $\pm$ 0.118} & \textbf{0.290 $\pm$ 0.222} \\
+    Both     & \textbf{0.0158 $\pm$ 0.0077} & \textbf{0.0158 $\pm$ 0.0052} & \textbf{0.197 $\pm$ 0.124} & \textbf{0.183 $\pm$ 0.070} \\
+    \bottomrule
+    \end{tabular}
+    }
+    \vspace{0.1cm}
+    \caption{Comparison of dipeptide AC with \gls{JS} divergence and \gls{PMF} error. 
+    To compute the mean and standard deviation, we have averaged the metrics across the dipeptides from the test set. Lower values are better.}   
+    \label{tab:minipeptide-ac-metrics}          
+\end{minipage}
+\hspace{0.3cm}
+\begin{minipage}[c]{.25\textwidth}
+    \captionsetup{type=figure} % back to figure
+    \vspace{-0.1cm}
+    \centering
+    \begin{subfigure}{\textwidth}
+        \centering
+        \includegraphics[width=1\linewidth]{figures/minipeptide/AC/scalar_fp_error}
+    \end{subfigure}
+    \vspace{-0.45cm}
+    \caption{Comparing the Fokker-Planck error for $\log \nnetprob$ of multiple models.}
+    \label{fig:minipeptide-fp-error}
+\end{minipage}
+\end{figure*}
