@@ -37,6 +37,14 @@ HTML_TEMPLATE = """
             margin-bottom: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }}
+        .problem {{
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }}
+        .problem:last-child {{
+            border-bottom: none;
+        }}
         h2 {{
             color: #0056b3;
             border-bottom: 1px solid #eee;
@@ -65,8 +73,8 @@ HTML_TEMPLATE = """
 PAPER_TEMPLATE = """
 <div class="paper">
     <h2>Paper: <a href="https://arxiv.org/abs/{paper_id}" target="_blank">{paper_id}</a></h2>
-    <div class="llm-output">
-        {llm_html_output}
+    <div class="problems-container">
+        {paper_content}
     </div>
 </div>
 """
@@ -84,12 +92,21 @@ def render_html():
             data = json.load(f)
         
         paper_id = data.get("paper_id", "Unknown")
-        llm_output = data.get("llm_output", "No content.")
+        problems = data.get("problems", [])
         
-        # Convert markdown to HTML
-        llm_html = markdown2.markdown(llm_output, extras=["fenced-code-blocks", "code-friendly"])
-        
-        paper_html = PAPER_TEMPLATE.format(paper_id=paper_id, llm_html_output=llm_html)
+        paper_content_html = ""
+        for problem in problems:
+            statement_html = markdown2.markdown(
+                problem.get("problem_statement", ""), 
+                extras=["fenced-code-blocks", "code-friendly"]
+            )
+            # Wrap the LaTeX solution for MathJax rendering as a block equation
+            final_solution = problem.get('final_solution', '')
+            solution_html = f"<strong>Solution:</strong>\n\\[{final_solution}\\]"
+            
+            paper_content_html += f"<div class='problem'>{statement_html}\n{solution_html}</div>"
+
+        paper_html = PAPER_TEMPLATE.format(paper_id=paper_id, paper_content=paper_content_html)
         all_papers_html += paper_html
 
     final_html = HTML_TEMPLATE.format(content=all_papers_html)

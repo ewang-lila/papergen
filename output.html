@@ -31,6 +31,14 @@
             margin-bottom: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
+        .problem {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .problem:last-child {
+            border-bottom: none;
+        }
         h2 {
             color: #0056b3;
             border-bottom: 1px solid #eee;
@@ -53,251 +61,66 @@
     <h1>arXiv Question-Answer Pairs</h1>
     
 <div class="paper">
-    <h2>Paper: <a href="https://arxiv.org/abs/2506.17126v1" target="_blank">2506.17126v1</a></h2>
-    <div class="llm-output">
-        <h3>Problem 1</h3>
+    <h2>Paper: <a href="https://arxiv.org/abs/2506.19832v1" target="_blank">2506.19832v1</a></h2>
+    <div class="problems-container">
+        <div class='problem'><h3>Problem 1</h3>
 
-<p><strong>Background.</strong> In ferroelectric materials the dielectric permittivity ( \varepsilon' ) above the phase transition temperature can be described by the Curie-Weiss law<br />
+<p><strong>Background:</strong><br />
+Consider a finite quantum system with a time-independent Hamiltonian ( H ) having (possibly degenerate) eigenvalues ( {E_k}_{k=1,\dots,w} ), with associated eigenstates ( |E_k\rangle ).<br />
+A stroboscopic measurement protocol is performed: The system starts at the state ( |\psi_\text{in}\rangle = |\psi_\text{d}\rangle ), and, after every interval ( \tau ), a projective measurement is made to test for arrival at ( |\psi_\text{d}\rangle ). The evolution between measurements is unitary, ( U(\tau) = \exp(-i H \tau) ) (( \hbar = 1 )). Let ( F_n ) be the probability that the first successful detection occurs at the ( n )-th measurement event (i.e., at time ( n\tau )). Let the set ( {p_k} ) be defined as ( p_k := |\langle E_k | \psi_\text{d} \rangle|^2 ), and let ( w ) be the number of *distinct* phase factors ( e^{-i E_k \tau} ) with ( p_k \neq 0 ).</p>
+
+<p><strong>Task:</strong><br />
+Derive an explicit formula for the mean first return time ( \langle n \rangle = \sum_{n=1}^\infty n F_n ) and show that it is equal to the winding number ( w ), i.e.,<br />
 [
-\frac{1}{\varepsilon'} = \frac{T-T_0}{C},
+\langle n \rangle = w,
 ]
-where ( T_0 ) is the Curie-Weiss temperature and ( C ) is the Curie-Weiss constant. In relaxor ferroelectrics, the dielectric maximum occurs at a frequency-dependent temperature ( T_M ) with peak value ( \varepsilon_M'(f) ). To phenomenologically capture the diffuse phase transition, the Curie-Weiss law is modified by introducing a diffuseness exponent ( \gamma ) so that the deviation from the maximum reciprocal permittivity is given as a power law in ( T-T_M ).  </p>
-
-<p><strong>Task.</strong> Derive the modified expression for the dielectric response that defines the diffuseness parameter ( \gamma ) in terms of ( \varepsilon'(T) ), ( \varepsilon_M'(f) ), ( T-T_M(f) ), and ( C ).</p>
-
-<p><strong>Solution:</strong><br />
-[
-\frac{1}{\varepsilon'}-\frac{1}{\varepsilon_M'(f)}=\frac{1}{C}\,(T-T_M(f))^\gamma.
-]
-<em>(Equation (2) in the paper)</em></p>
+where ( w ) is the number of distinct nonzero-overlap energy phase factors as defined above.</p>
 
 <hr />
 
-<h3>Problem 2</h3>
+<h2>#</h2>
 
-<p><strong>Background.</strong> In perovskite ferroelectric materials such as lead scandium tantalate (PST), the degree of structural B‐site ordering is characterized by comparing the intensities of two x-ray diffraction peaks. The intensity ( I_{111} ) corresponds to the pseudocubic (111) superstructure peak that appears only when there is ordering, and ( I_{200} ) corresponds to the symmetry-allowed fundamental (200) peak. For a perfectly ordered system, the theoretical intensity ratio is denoted by<br />
+<strong>Solution:</strong>
+\[\langle n \rangle = w\]</div><div class='problem'><h3>Problem 2</h3>
+
+<p>Background:</p>
+
+<p>Consider a quantum walk on a finite graph, evolving under a time-independent Hamiltonian ( H ), with periodic stroboscopic projective measurements performed every interval (\tau). The system is initialized and monitored at state (|\psi_\mathrm{d}\rangle) (the recurrence problem). Let (n) be the random number of measurements until the first detection. In the limit of infinitely many measurement attempts, the mean recurrence time (in units of (\tau)) is quantized as (w): the number of distinct phases (\exp(-i E_k \tau)) for energies (E_k) with nonzero overlap with (|\psi_\mathrm{d}\rangle).</p>
+
+<p>However, in any experiment, the maximum number of measurement attempts is finite, denoted (T_R), after which the protocol is restarted if no detection occurs. The mean number of attempts until first detection, conditioned on occurrence within (T_R) measurements, is denoted ( \langle n \rangle_{\mathrm{Con}} ).</p>
+
+<p>Near a resonance where two phase factors (\exp(-iE_+\tau)) and (\exp(-iE_-\tau)) nearly coincide (i.e., (\tau |E_+ - E_-| \mod 2\pi \approx 0)), exactly one zero (z_m) of the survival generating function approaches the unit circle, with (|z_m|^2 = 1 - \epsilon^2), where (\epsilon \ll 1). In this regime, the variance of (n) for infinite (T_R) is given by
 [
-\left(\frac{I_{111}}{I_{200}}\right)_{S=1}.
-]<br />
-An ordering coefficient ( S ) is introduced such that its square scales the measured intensity ratio to the ideal one.  </p>
-
-<p><strong>Task.</strong> Derive the expression for the ordering coefficient ( S ) in terms of the measured intensity ratio ( I_{111}/I_{200} ) and the theoretical ratio for a perfectly ordered system.</p>
-
-<p><strong>Solution:</strong><br />
-[
-S^2 = \frac{\left(\frac{I_{111}}{I_{200}}\right)}{\left(\frac{I_{111}}{I_{200}}\right)_{S=1}}.
-]
-<em>(Equation (3) in the paper)</em></p>
-
-<hr />
-
-<h3>Problem 3</h3>
-
-<p><strong>Background.</strong> Experimental studies on PST have revealed that the diffuseness of the phase transition, quantified by the exponent ( \gamma ), depends on the degree of structural ordering represented by the coefficient ( S ). When the sample is fully disordered (( S=0 )), relaxor behavior is manifested with ( \gamma ) near 2, whereas nearly perfect ordering (( S ) close to 1) yields ferroelectric behavior with ( \gamma ) around 1. A linear relation between ( \gamma ) and ( S ) has been found to describe the experimental data across different sample geometries.  </p>
-
-<p><strong>Task.</strong> Derive the linear relation between the diffuseness exponent ( \gamma ) and the ordering parameter ( S ).</p>
-
-<p><strong>Solution:</strong><br />
-[
-\gamma(S) = 1.93 - 1.06\,S.
-]
-<em>(As stated in the paper)</em></p>
-
-    </div>
-</div>
-
-<div class="paper">
-    <h2>Paper: <a href="https://arxiv.org/abs/2506.17139v1" target="_blank">2506.17139v1</a></h2>
-    <div class="llm-output">
-        <h3>Problem 1</h3>
-
-<p><strong>Background.</strong><br />
-Consider the variance‐preserving (VP) stochastic differential equation (SDE) given by<br />
-[
-\d{x} = -\frac{1}{2}\beta(t)\, x\,\d{t} + \sqrt{\beta(t)}\,\d{w},
-]<br />
-with the time‐dependent noise scale defined by<br />
-[
-\beta(t) = \beta_{\min} + t\,(\beta_{\max}-\beta_{\min}).
-]<br />
-For such an affine SDE, the transition probability from the initial condition ( x(0) ) to the state ( x(t) ) can be written in closed form as a Gaussian distribution.</p>
-
-<p><strong>Task.</strong><br />
-Show that the transition kernel for this VP diffusion SDE can be expressed as<br />
-[
-p_t(x(t) \mid x(0)) = \mathcal{N}!\Bigl(x(t);\, \mu(x(0),t),\, \sigma(t)\,I\Bigr),
-]<br />
-with the mean ( \mu(x(0),t) ) and variance ( \sigma(t) ) given in terms of the cumulative noise function. That is, derive the expression for<br />
-[
-\mu(x(0),t)=\exp!\left(-\tfrac{1}{2}\int_0^t\beta(s)\,\d{s}\right)x(0)
-]<br />
-and<br />
-[
-\sigma(t)=1-\exp!\left(-\int_0^t\beta(s)\,\d{s}\right).
+\mathrm{Var}(n) \approx \frac{2}{\epsilon^2}.
 ]</p>
 
-<p><strong>Solution:</strong><br />
-The final result appears verbatim in the paper as<br />
+<p>Task:</p>
+
+<p>Using the above, derive an explicit expression for the conditional mean ( \langle n \rangle_{\mathrm{Con}} ) in terms of (w), the finite restart time (T_R), and the variance (\mathrm{Var}(n)) near the resonance (i.e., for (\epsilon\rightarrow 0), large (T_R), but (\sigma = \epsilon^2 T_R) finite). Your final expression should contain only (w), (T_R), and (\mathrm{Var}(n)), with no dependence on (\epsilon) or (z_m).</p>
+
+<h2>#</h2>
+
+<strong>Solution:</strong>
+\[\langle n \rangle_{\mathrm{Con}}
+= w - \left[ \frac{2 T_R}{\mathrm{Var}(n)} + 1\right] \exp\left[ -\frac{2 T_R}{\mathrm{Var}(n)}\right]\]</div><div class='problem'><h3>Problem 3</h3>
+
+<p>Background:<br />
+Consider a finite-dimensional quantum system with time-independent Hamiltonian ( H ) (with ( \hbar=1 )), subjected to repeated projective measurements at fixed intervals ( \tau ), where the initial and detection state coincide, ( |\psi_\mathrm{in}\rangle = |\psi_\mathrm{d}\rangle ). Define the quantum first-detection protocol: at each time ( n\tau ), perform a projective measurement onto ( |\psi_\mathrm{d}\rangle ) and record the first “yes” outcome; repeat the process for an ensemble and consider only realizations where detection occurs within ( T_R ) measurement attempts (i.e., within time ( T_R \tau )). Let the first-detection probability at step ( n ) be ( F_n ), and the conditional mean number of measurements is
 [
-p_t(x(t) \mid x(0)) = \mathcal{N}\Bigl(x(t);\, e^{-\frac{1}{2}\int_{0}^{t} \beta(s)\,\d{s}}\; x(0),\, \bigl(1 - e^{-\int_{0}^{t} \beta(s)\,\d{s}}\bigr)\,I\Bigr).
+\langle n \rangle_\text{Con} = \frac{ \sum_{n=1}^{T_R} n F_n }{ \sum_{n=1}^{T_R} F_n }.
 ]
-——— (see Section “Diffusion” in the paper)</p>
+In the vicinity of a topological transition, suppose that ( F_n \approx a(z_m)|z_m|^{2n} ) for large ( n ), where ( |z_m| \lesssim 1 ) is the modulus of the zero of the generating function closest to the unit circle, so that ( a(z_m) \approx (1 - |z_m|^2)^2 ).</p>
 
-<hr />
-
-<h3>Problem 2</h3>
-
-<p><strong>Background.</strong><br />
-In energy-based diffusion models one needs to compute the time-derivative of the log-density (\partial_t \log p_t(x)). A finite-difference approximation based on sampled times is used to avoid computing derivatives exactly. Let (h_s) and (h_d) be small positive hyperparameters.  </p>
-
-<p><strong>Task.</strong><br />
-Derive the following finite-difference approximation for (\partial_t \log p_t(x)):
+<p>Show that in the joint limit ( |z_m|^2 = 1-\epsilon^2 ) with ( \epsilon \ll 1 ), and ( T_R \to \infty ) such that ( \sigma = T_R \epsilon^2 ) is finite, the conditional mean number of measurement steps satisfies
 [
-\partial_t \log p_t(x) \approx \frac{h_s^2\,\log p_t(x,\,t+h_d) + \bigl(h_d^2-h_s^2\bigr)\,\log p_t(x,t) - h_d^2\,\log p_t(x,\,t-h_s)}{h_s\,h_d\,(h_s+h_d)}.
-]</p>
-
-<p><strong>Solution:</strong><br />
-The final expression is given verbatim in the paper as<br />
-[
-\partial_t \log p_t(x) \approx \frac{h_s^2\,\log p_t(x,\,t+h_d) + \bigl(h_d^2-h_s^2\bigr)\,\log p_t(x,t) - h_d^2\,\log p_t(x,t-h_s)}{h_s\,h_d\,(h_s+h_d)}.
+\langle n \rangle_\text{Con} = w - (\sigma + 1) e^{-\sigma}
 ]
-——— (see Equation (finite-difference) in the paper)</p>
+where ( w ) is the quantized mean for infinite measurement time, and ( \sigma = T_R \epsilon^2 ).</p>
 
-<hr />
+<h2>#</h2>
 
-<h3>Problem 3</h3>
-
-<p><strong>Background.</strong><br />
-For a diffusion process governed by<br />
-[
-\d{x} = f(x,t)\,\d{t} + g(t)\,\d{w},
-]<br />
-the probability density ( p_t(x) ) evolves in time according to the Fokker–Planck equation. In logarithmic form, this equation relates the time-derivative of the log-density to derivatives of ( \log p_t(x) ) and the drift ( f(x,t) ).</p>
-
-<p><strong>Task.</strong><br />
-Show that the log-density of ( p_t(x) ) satisfies the following equation:
-[
-\partial_t \log p_t(x) = \frac{1}{2}\,g^2(t)\left[\operatorname{div}_x!\bigl(\nabla_x \log p_t(x)\bigr) + \left\Vert \nabla_x \log p_t(x) \right\Vert_2^2\right] - \langle f(x,t),\,\nabla_x \log p_t(x) \rangle - \operatorname{div}_x\bigl(f(x,t)\bigr).
-]</p>
-
-<p><strong>Solution:</strong><br />
-The paper states the Fokker–Planck equation for the log-density verbatim as<br />
-[
-\partial_t \log p_t(x) = \frac{1}{2}\,g^2(t)\left[\operatorname{div}_x!\bigl(\nabla_x \log p_t(x)\bigr) + \left\Vert \nabla_x \log p_t(x) \right\Vert_2^2\right] - \langle f(x,t),\,\nabla_x \log p_t(x) \rangle - \operatorname{div}_x\bigl(f(x,t)\bigr).
-]
-——— (see Equation (Fokker-Planck) in the paper)</p>
-
-<hr />
-
-<h3>Problem 4</h3>
-
-<p><strong>Background.</strong><br />
-To enforce that an energy-based diffusion model satisfies the Fokker–Planck equation, the paper introduces a residual<br />
-[
-R(x,t) = \mathcal{F}_{p}(x,t) - \partial_t \log p_t(x),
-]<br />
-where<br />
-[
-\mathcal{F}_{p}(x,t)= \frac{1}{2}\,g^2(t)\left[\operatorname{div}_x\bigl(\nabla_x \log p_t(x)\bigr) + \|\nabla_x \log p_t(x)\|_2^2\right] - \langle f(x,t), \nabla_x \log p_t(x)\rangle - \operatorname{div}_x\bigl(f(x,t)\bigr).
-]<br />
-Since directly computing higher-order derivatives (e.g. divergence) is computationally costly, a weak residual formulation is introduced. For a small parameter (\sigma>0) and a perturbation ( v \sim \mathcal{N}(0,\sigma^2 I) ), one defines an unbiased estimator ( \widetilde{R}(x,t;v) ) of the residual using only first-order derivative information.</p>
-
-<p><strong>Task.</strong><br />
-Show that an unbiased estimator of the residual can be written as<br />
-[
-\widetilde{R}(x,t; v) = \frac{1}{2}\,g^2(t)\,\left[ \left(\frac{v}{\sigma}\right)^\top \frac{s(x+v,t)-s(x-v,t)}{2\sigma} + \|s(x+v,t)\|_2^2\right] - \langle f(x+v,t),\, s(x+v,t)\rangle - \operatorname{div}_x\bigl(f(x+v,t)\bigr) - \partial_t\log p_t(x+v),
-]
-where the score ( s(x,t) = \nabla_x \log p_t(x) ).</p>
-
-<p><strong>Solution:</strong><br />
-The final result in the paper is given verbatim as<br />
-[
-\widetilde{R}(x,t; v) = \frac{1}{2}\,g^2(t)\,\left[ \left(\frac{v}{\sigma}\right)^\top \frac{s(x+v,t)-s(x-v,t)}{2\sigma} + \|s(x+v,t)\|_2^2\right] - \langle f(x+v,t),\, s(x+v,t)\rangle - \operatorname{div}_x\bigl(f(x+v,t)\bigr) - \partial_t\log p_t(x+v).
-]
-This yields an unbiased estimator for the weak residual, which can then be used within the Fokker–Planck regularization loss.<br />
-——— (see Theorem “Weak Residual Formulation” in the paper)</p>
-
-    </div>
-</div>
-
-<div class="paper">
-    <h2>Paper: <a href="https://arxiv.org/abs/2506.17194v1" target="_blank">2506.17194v1</a></h2>
-    <div class="llm-output">
-        <h3>Problem 1</h3>
-
-<p><strong>Background.</strong> Consider a two‐dimensional system whose local order parameters near a corner exhibit a power‐law behavior characterized by critical exponents. Let $\beta_b$ be the boundary (edge) magnetization critical exponent and $\beta_c$ be the corner magnetization critical exponent. The angle between the two adjacent edges forming the corner is denoted by $\theta$. In the framework of boundary conformal field theory and as shown by Cardy, there is a simple relation connecting these two exponents.  </p>
-
-<p><strong>Task.</strong> Derive an analytic expression for the corner critical exponent $\beta_c$ in terms of the boundary exponent $\beta_b$ and the angle $\theta$.  </p>
-
-<p><strong>Solution:</strong><br />
-[
-\beta_c = \frac{\pi}{\theta}\,\beta_b.
-]
-<em>(Quoted verbatim from the paper: “The relation of these two critical exponents is<br />
-[
-\beta_c = \frac\pi\theta\beta_b,
-]
-where $\theta$ is the angle between the edges of the corner.”)</em></p>
-
-<hr />
-
-<h3>Problem 2</h3>
-
-<p><strong>Background.</strong> The two-dimensional Ising model on a square lattice is described by the Hamiltonian<br />
-[
-H = -\sum_{\langle i,j\rangle} \sigma_i\sigma_j,
-]
-with spins $\sigma_k\in{0,1}$ and the summation running over nearest neighbor pairs. The exact analytical result for the magnetization $M$ in the bulk (i.e. measured at the center of the system) was derived by Yang. The expression involves the hyperbolic sine function and is expressed in reduced units where temperature enters as $1/T$.  </p>
-
-<p><strong>Task.</strong> Derive the analytic expression for the bulk magnetization $M$ as a function of the temperature $T$.  </p>
-
-<p><strong>Solution:</strong><br />
-[
-M = \left[ 1- \frac{1}{\sinh^4\left(\frac{1}{T}\right)}\right]^{\frac{1}{8}}.
-]
-<em>(Quoted verbatim from the paper, Equation (exactbulk):<br />
-“\begin{eqnarray}\label{exactbulk}
-M &amp;= \left[ 1- \frac1{\sinh^4\left(\frac1T\right)}\right]^{\frac18},\
-\end{eqnarray}”)</em></p>
-
-<hr />
-
-<h3>Problem 3</h3>
-
-<p><strong>Background.</strong> For the two-dimensional Ising model, the magnetization measured at the boundary (specifically, on the middle of the border) is given by an exact analytic formula. This expression accounts for the reduced coordination at the edge and involves hyperbolic functions evaluated at $2/T$. The boundary magnetization, denoted by $M_b$, provides a distinct critical behavior compared to the bulk.  </p>
-
-<p><strong>Task.</strong> Derive the analytic expression for the boundary magnetization $M_b$ in terms of the temperature $T$.  </p>
-
-<p><strong>Solution:</strong><br />
-[
-M_b = \sqrt{\frac{\cosh\left(\frac{2}{T}\right) - \coth\left(\frac{2}{T}\right)}{\cosh\left(\frac{2}{T}\right)-1}}.
-]
-*(Quoted verbatim from the paper, Equation (\ref{exactcorner}):<br />
-“\begin{eqnarray}\label{exactcorner}
-M_b &amp;= \sqrt{\frac{\cosh\left(\frac2T\right) - \coth\left(\frac2T\right)}{\cosh\left(\frac2T\right)-1}},\
-\end{eqnarray}”)*</p>
-
-<hr />
-
-<h3>Problem 4</h3>
-
-<p><strong>Background.</strong> In order to extract the critical exponent $\beta$ from numerical data, one considers the ratio<br />
-[
-R(T) = \frac{M}{M'},
-]
-where $M$ is the magnetization and $M'=\frac{dM}{dT}$ its first derivative with respect to temperature. Near the critical temperature $T_C$, the non-analytical part of the temperature dependence can be removed by a Taylor expansion of $R(T)$ in powers of $(T_C-T)$. This leads to a fitting function characterized by a linear term with coefficient $-1/\beta$ and a quadratic correction with coefficient $c$.  </p>
-
-<p><strong>Task.</strong> Derive the analytic form of the fitting function for the ratio $R(T)$ as a function of $T$, including the critical exponent $\beta$, the critical temperature $T_C$, and the coefficient $c$.  </p>
-
-<p><strong>Solution:</strong><br />
-[
-R(T) = -\frac{1}{\beta}\left(T_C - T\right) + c\left(T_C - T\right)^2.
-]
-<em>(Quoted verbatim from the paper, Equation (\ref{rfit}):<br />
-“\begin{equation}\label{rfit}
-R(T) =  -\frac1\beta\left(T_C - T\right) + c\left(T_C - T\right)^2,
-\end{equation}”)</em></p>
-
+<strong>Solution:</strong>
+\[\langle n \rangle_\text{Con} = w - (\sigma + 1) e^{-\sigma}\]</div>
     </div>
 </div>
 
