@@ -1,4 +1,8 @@
 arxiv
 openai
 python-dotenv
-markdown2 
+argparse
+markdown2
+markdown-it-py
+mdit-py-plugins 
+google-genai

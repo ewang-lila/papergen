@@ -1,7 +1,7 @@
 import json
 import glob
 import os
-import markdown2
+import html
 
 OUTPUT_DIR = "output"
 HTML_TEMPLATE = """
@@ -96,10 +96,26 @@ def render_html():
         
         paper_content_html = ""
         for problem in problems:
-            statement_html = markdown2.markdown(
-                problem.get("problem_statement", ""), 
-                extras=["fenced-code-blocks", "code-friendly"]
-            )
+            
+            statement_raw = problem.get("problem_statement", "")
+            
+            # A more robust method that avoids a markdown parser that can corrupt LaTeX.
+            lines = statement_raw.split('\\n')
+            html_lines = []
+            for line in lines:
+                # Escape the entire line to protect special characters
+                safe_line = html.escape(line)
+
+                # Then, selectively apply formatting to known patterns
+                if safe_line.startswith('### '):
+                    safe_line = f"<h3>{safe_line[4:]}</h3>"
+                elif safe_line.startswith('**') and safe_line.endswith('**'):
+                     safe_line = f"<strong>{safe_line[2:-2]}</strong>"
+
+                html_lines.append(safe_line)
+
+            statement_html = "<br>".join(html_lines)
+
             # Wrap the LaTeX solution for MathJax rendering as a block equation
             final_solution = problem.get('final_solution', '')
             solution_html = f"<strong>Solution:</strong>\n\\[{final_solution}\\]"

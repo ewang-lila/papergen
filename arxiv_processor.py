@@ -33,7 +33,7 @@ Your task: create ONE problem that reflects the {segment} third of the paper's m
 - Clarity. Begin each question with a short "Background" paragraph that defines all symbols and states all assumptions used later in that question, as well as some context. End with a "Task" sentence that states exactly what the student must show, without revealing the final expression.
 - Solutions section. After each question, give the ground-truth solution expression from the paper. Do not repeat any derivation steps; only output the final solution in latex \boxed{{}}, after the "### Solution:" text.
 - No extraneous parts. Omit numerical verification, coding exercises, open-ended extensions, grading rubrics, etc. Write only the problem (with the background and task) and the solution. DO NOT INCLUDE ANYTHING ELSE IN YOUR RESPONSE!
-- Format everything in Markdown and LaTeX code.
+- Format everything in proper Markdown and LaTeX code.
 
 ---
 
@@ -49,11 +49,11 @@ Following these instructions, read the attached paper and create problem {proble
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
-    # "physics.chem-ph",     # Chemical Physics
-    # "math-ph.math-ph",      # Mathematical Physics
-    # "nlin.nlin.ao",
-    # "cond-mat.soft",
-    # "cond-mat.cond-mat.dis-nn"
+    "physics.chem-ph",     # Chemical Physics
+    "math-ph.math-ph",      # Mathematical Physics
+    "nlin.nlin.ao",
+    "cond-mat.soft",
+    "cond-mat.cond-mat.dis-nn"
 
 ]
 

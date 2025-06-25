@@ -1,2 +1,5 @@
 .env
 arxiv_papers/
+output/
+tex_exports/
+output.html
