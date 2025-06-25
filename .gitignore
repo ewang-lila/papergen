@@ -1,5 +1,18 @@
+# Environment variables
 .env
-arxiv_papers/
-output/
-tex_exports/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Generated data directories (inside the new 'output' parent directory)
+output/arxiv_papers/
+output/raw_json_outputs/
+output/tex_exports/
+
+# Explicitly track these files within the output directory
+!output/all_papers_problems.json
+!output/all_papers_problems_filtered.json
+
+# Ignore other generated HTML output
 output.html

@@ -3,8 +3,8 @@ import glob
 import os
 
 # Directories
-SOURCE_DIR = "output"
-EXPORT_DIR = "tex_exports"
+INPUT_FILENAME = "output/all_papers_problems.json"
+EXPORT_DIR = "output/tex_exports"
 
 # LaTeX document template
 TEX_TEMPLATE = r"""
@@ -37,18 +37,21 @@ def export_to_tex():
     # Ensure the export directory exists
     os.makedirs(EXPORT_DIR, exist_ok=True)
 
-    json_files = glob.glob(os.path.join(SOURCE_DIR, "*.json"))
-    if not json_files:
-        print(f"No JSON files found in '{SOURCE_DIR}' directory.")
+    if not os.path.exists(INPUT_FILENAME):
+        print(f"Input file '{INPUT_FILENAME}' not found. Please run consolidate_output.py first.")
+        return
+
+    with open(INPUT_FILENAME, 'r', encoding='utf-8') as f:
+        all_papers_data = json.load(f)
+    
+    if not isinstance(all_papers_data, list):
+        print(f"Expected a list of papers in '{INPUT_FILENAME}', but found a different structure.")
         return
 
     exported_files = []
-    for file_path in sorted(json_files):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        paper_id = data.get("paper_id", "Unknown")
-        problems = data.get("problems", [])
+    for paper_data in all_papers_data:
+        paper_id = paper_data.get("paper_id", "Unknown")
+        problems = paper_data.get("problems", [])
         
         tex_content = ""
         for i, problem in enumerate(problems):

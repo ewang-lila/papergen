@@ -3,7 +3,7 @@ import glob
 import os
 import html
 
-OUTPUT_DIR = "output"
+OUTPUT_DIR = "output/raw_json_outputs"
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">

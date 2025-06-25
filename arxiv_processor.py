@@ -3,62 +3,32 @@ import tarfile
 import os
 import openai
 from openai import OpenAI
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 import argparse
 import json
 import glob
 import re
+from prompt_template import LLM_PROMPT_TEMPLATE
 
 load_dotenv()
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
-LLM_PROMPT_TEMPLATE = """
-You are an expert researcher in the sciences. 
-
-## Task  
-You are provided a published research paper in physics. The paper's main results can be divided into three clear sections. 
-
-Your task: create ONE problem that reflects the {segment} third of the paper's main mathematical and physical work. There are already problems for the other two thirds of the paper, and each problem should focus on a different aspect of the results, so make sure your problem captures the area you have been given.
-
----
-
-## Strict requirements  
-
-- Independence. Every question must be *fully self-contained* and exactly follow the steps provided in the paper: embed all notation, assumptions, and context that the student needs *inside that single question*. Do **not** refer to any "previous problem", "same system", "as shown in the paper", etc.
-- Focus. Each question asks the student to derive one analytical result that appears in the paper (e.g. a specific equation). Do not ask to "show," "prove," or "verify" a result, since the grader only considers the student's final result. The question also may not rely on data analysis; it should only involve derivations and reasoning.
-- Difficulty balance. A problem should require several algebraic steps and have a unique, objectively checkable answer that is directly written in the paper. I.e., every problem must have a solution that directly corresponds to a result in the paper. The problem must be mathematically nontrivial. The final answer should be a mathematical expression with multiple terms, not a simple number or single variable. 
-- Equation-oriented. The problem should guide students through deriving a specific result that appears in the paper, not proving a general concept.
-- Non-duplication. Since you're creating problem {problem_number} of 3, ensure this problem focuses on a different mathematical step than what would be natural for the other problems.
-- Clarity. Begin each question with a short "Background" paragraph that defines all symbols and states all assumptions used later in that question, as well as some context. End with a "Task" sentence that states exactly what the student must show, without revealing the final expression.
-- Solutions section. After each question, give the ground-truth solution expression from the paper. Do not repeat any derivation steps; only output the final solution in latex \boxed{{}}, after the "### Solution:" text.
-- No extraneous parts. Omit numerical verification, coding exercises, open-ended extensions, grading rubrics, etc. Write only the problem (with the background and task) and the solution. DO NOT INCLUDE ANYTHING ELSE IN YOUR RESPONSE!
-- Format everything in proper Markdown and LaTeX code.
-
----
-
-### Problem
-
-Background:  
-
-Task:
-
-### Solution:
-
-Following these instructions, read the attached paper and create problem {problem_number} of 3."""
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
     "physics.chem-ph",     # Chemical Physics
     "math-ph.math-ph",      # Mathematical Physics
-    "nlin.nlin.ao",
+    "nlin.ao",
     "cond-mat.soft",
-    "cond-mat.cond-mat.dis-nn"
+    "cond-mat.dis-nn"
 
 ]
 
-DOWNLOAD_DIR = "arxiv_papers"
-OUTPUT_DIR = "output"
+DOWNLOAD_DIR = "output/arxiv_papers"
+OUTPUT_DIR = "output/raw_json_outputs"
 
 def setup_directories():
     """Creates the necessary directories if they don't exist."""
@@ -212,12 +182,47 @@ def generate_single_problem(tex_content: str, segment: str, problem_number: int)
         print(f"An unexpected error occurred with OpenAI API: {e}")
         return None
 
+def generate_single_problem_gemini(tex_content: str, segment: str, problem_number: int):
+    """
+    Sends the LaTeX content to the Google Gemini model to generate a single problem.
+    """
+    if not GOOGLE_API_KEY:
+        print("Error: GOOGLE_API_KEY environment variable not set.")
+        return None
+
+    try:
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        
+        prompt = LLM_PROMPT_TEMPLATE.format(segment=segment, problem_number=problem_number)
+        
+        # Combine the prompt and the paper content
+        full_prompt = f"{prompt}\\n\\nHere is the LaTeX content:\\n\\n{tex_content}"
+
+        response = client.models.generate_content(
+            model="models/gemini-2.5-flash",
+            contents=full_prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.0 # Set deterministic temperature
+            ),
+        )
+        return response.text
+    except Exception as e:
+        print(f"An unexpected error occurred with Google Gemini API: {e}")
+        return None
+
 def main():
     parser = argparse.ArgumentParser(description="Fetch arXiv papers, process them with an LLM, and save the results.")
     parser.add_argument(
         "--no-download",
         action="store_true",
         help="Skip downloading and use existing files in the download directory."
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="gemini",
+        choices=["o3", "gemini"],
+        help="The model to use for generation (o3 or gemini)."
     )
     args = parser.parse_args()
 
@@ -231,7 +236,7 @@ def main():
             return
     else:
         print("Searching for and downloading new papers.")
-        downloaded_archives = search_and_download_papers(max_results_per_category=1)
+        downloaded_archives = search_and_download_papers(max_results_per_category=10)
 
     for archive in downloaded_archives:
         print(f"Processing archive: {archive}")
@@ -241,13 +246,19 @@ def main():
             problems_data = []
             segments = ["first", "second", "last"]
             for i, segment in enumerate(segments):
-                print(f"Generating problem {i+1} for the {segment} third of the paper...")
-                raw_output = generate_single_problem(combined_tex_content, segment, i+1)
+                print(f"Generating problem {i+1} for the {segment} third of the paper using model: {args.model}...")
+                
+                raw_output = None
+                if args.model == "gemini":
+                    raw_output = generate_single_problem_gemini(combined_tex_content, segment, i+1)
+                else: # Default to o3
+                    raw_output = generate_single_problem(combined_tex_content, segment, i+1)
+
                 if raw_output:
                     parsed_problem = parse_llm_output(raw_output)
                     if parsed_problem:
                          # Add problem number to the statement
-                        parsed_problem['problem_statement'] = f"### Problem {i+1}\n\n" + parsed_problem['problem_statement']
+                        parsed_problem['problem_statement'] = parsed_problem['problem_statement']
                         problems_data.append(parsed_problem)
                     else:
                         print(f"Could not parse LLM output for the {segment} segment.")
