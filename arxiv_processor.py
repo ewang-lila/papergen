@@ -218,6 +218,12 @@ def main():
         help="Skip downloading and use existing files in the download directory."
     )
     parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Limit the number of papers to process from the local directory. Only used with --no-download."
+    )
+    parser.add_argument(
         "--model",
         type=str,
         default="gemini",
@@ -230,10 +236,13 @@ def main():
 
     if args.no_download:
         print("Skipping download. Using existing files.")
-        downloaded_archives = glob.glob(os.path.join(DOWNLOAD_DIR, "*.tar.gz"))
+        downloaded_archives = sorted(glob.glob(os.path.join(DOWNLOAD_DIR, "*.tar.gz")))
         if not downloaded_archives:
             print(f"No existing .tar.gz files found in '{DOWNLOAD_DIR}'.")
             return
+        if args.limit:
+            print(f"Limiting processing to the first {args.limit} papers.")
+            downloaded_archives = downloaded_archives[:args.limit]
     else:
         print("Searching for and downloading new papers.")
         downloaded_archives = search_and_download_papers(max_results_per_category=10)
@@ -244,9 +253,9 @@ def main():
         
         if combined_tex_content:
             problems_data = []
-            segments = ["first", "second", "last"]
+            segments = ["first half", "second half"]
             for i, segment in enumerate(segments):
-                print(f"Generating problem {i+1} for the {segment} third of the paper using model: {args.model}...")
+                print(f"Generating problem {i+1} for the {segment} of the paper using model: {args.model}...")
                 
                 raw_output = None
                 if args.model == "gemini":

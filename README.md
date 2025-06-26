@@ -1,60 +1,74 @@
-The project can be run via 
+# O3 Paper Converter
+
+This project contains a suite of tools to download physics papers from arXiv, convert their key findings into solvable problems, evaluate LLMs against these problems, and generate benchmark reports.
+
+## Core Workflow
+
+The project is designed to be run as a sequential pipeline. Here is the recommended workflow:
+
+### Step 1: Generate Problems from Papers
+First, download papers from arXiv and use an LLM to generate problems from their content. The script saves one JSON file per paper in `output/raw_json_outputs/`.
+
 ```bash
 python arxiv_processor.py
 ```
 
-This will download the most recent arXiv paper from each of the categories listed in the file. Adding the 
-```--no-download``` flag will process only the files already downloaded locally. The default model is Gemini 2.5 Flash, but o3 is also an option. 
+**Common Options:**
+- `--no-download`: Use this flag to skip downloading and process papers already present in `output/arxiv_papers/`.
+- `--limit <N>`: When used with `--no-download`, this will only process the first `N` papers found locally.
+- `--model <model_name>`: Choose the model for problem generation (e.g., `gemini` or `o3`).
 
-Running 
+Example: Process the first 5 local papers using the `gemini` model.
 ```bash
-python arxiv_processor.py --model gemini --no-download
-```
-will 
-
-The problems and answers can be rendered in your browser using 
-```bash
-python render_output.py && open output.html
-```
-This doesn't work very well though, so it's more reliable to convert the jsons to LaTeX and manually compile in overleaf using
-```bash
-python export_to_tex.py                               
+python arxiv_processor.py --no-download --model gemini --limit 5
 ```
 
-## Benchmarking LLMs
+### Step 2: Consolidate and Filter Raw Outputs
+Next, combine the many individual JSON files into a single, clean master file. This script also filters out low-quality or malformed problems and reports on how many were removed.
 
-This project also includes a script to benchmark various LLMs on the problems generated from the papers.
+```bash
+python consolidate_and_filter.py
+```
+This script reads all files from `output/raw_json_outputs/`, filters them, and creates a single clean dataset at `output/all_papers_problems_filtered.json`.
 
-### Setup
+### Step 3: Benchmark LLMs
+Evaluate the performance of different LLMs on the set of filtered problems.
 
-1.  **Install dependencies:** Make sure you have all the required packages installed.
+```bash
+python benchmark_llms.py
+```
+This script takes the filtered problems, gets solutions from the specified LLMs, uses a judge model to score them, and saves the detailed results to `output/benchmark_results.json`.
+
+**Common Options:**
+*   `--models`: Specify which models to benchmark (e.g., `o3`, `gpt-4o`).
+*   `--limit`: Limit the number of problems to evaluate for a quick test.
+
+Example: Benchmark `o3` and `gpt-4o` on the first 10 problems.
+```bash
+python benchmark_llms.py --models o3 gpt-4o --limit 10
+```
+
+### Step 4: Generate a LaTeX Report
+Create a high-quality, human-readable report from the benchmark results.
+
+```bash
+python export_benchmark_to_tex.py
+```
+This script reads `output/benchmark_results.json` and generates a comprehensive LaTeX file at `output/solutions_report.tex`. You can then compile this into a PDF using any LaTeX distribution (e.g., `pdflatex`):
+```bash
+pdflatex -output-directory=output output/solutions_report.tex
+```
+
+## Setup for Benchmarking
+
+1.  **Install dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
 
-2.  **Set up API Keys:** Create a `.env` file in the root of the project and add your API keys for the services you want to use.
-
+2.  **Set up API Keys:** Create a `.env` file in the project root and add your API keys:
     ```
     OPENAI_API_KEY="your_openai_api_key"
     ANTHROPIC_API_KEY="your_anthropic_api_key"
     GOOGLE_API_KEY="your_google_api_key"
     ```
-
-### Running the Benchmark
-
-You can run the benchmark using the `benchmark_llms.py` script.
-
-```bash
-python benchmark_llms.py
-```
-
-The script supports several command-line arguments:
-
-*   `--models`: A list of models to benchmark. Defaults to all supported models.
-    Example: `python benchmark_llms.py --models gpt-4o claude-3-opus-20240229`
-*   `--limit`: Limit the number of problems to evaluate for a quick test.
-    Example: `python benchmark_llms.py --limit 5`
-*   `--output-file`: Specify a custom output file for the results.
-    Example: `python benchmark_llms.py --output-file output/my_benchmark_results.json`
-
-The results, including the model-generated solutions, judge's evaluation, and scores, will be saved to `output/benchmark_results.json` by default.
