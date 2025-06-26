@@ -10,7 +10,7 @@ Your task: create ONE problem that reflects the {segment} third of the paper's m
 
 ## Strict requirements  
 
-- Independence. Every question must be *fully self-contained* and exactly follow the steps provided in the paper: embed all notation, assumptions, and context that the student needs *inside that single question*. Do **not** refer to any "previous problem", "same system", "as shown in the paper", etc.
+- Independence. Every question must be *fully self-contained* and exactly follow the steps provided in the paper: embed all notation, assumptions, and context that the student needs *inside that single question*. Do **not** refer to any "previous problem", "same system", "as shown in the paper", etc. There should be no references to the paper in the problem statement, since your problem statement should fully capture the work of the paper.
 - Focus. Each question asks the student to derive one analytical result that appears in the paper (e.g. a specific equation). Do not ask to "show," "prove," or "verify" a result, since the grader only considers the student's final result. The question also may not rely on data analysis; it should only involve derivations and reasoning.
 - Difficulty balance. A problem should require several algebraic steps and have a unique, objectively checkable answer that is directly written in the paper. I.e., every problem must have a solution that directly corresponds to a result in the paper. The problem must be mathematically nontrivial. The final answer should be a mathematical expression with multiple terms, not a simple number or single variable. 
 - Equation-oriented. The problem should guide students through deriving a specific result that appears in the paper, not proving a general concept.

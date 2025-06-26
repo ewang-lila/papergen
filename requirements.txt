@@ -6,3 +6,5 @@ markdown2
 markdown-it-py
 mdit-py-plugins 
 google-genai
+anthropic
+tqdm

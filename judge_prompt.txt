@@ -1,0 +1,24 @@
+You are an expert judge evaluating solutions to physics and math problems.
+Your task is to assess a model-generated solution based on a provided ground truth solution.
+You must use the following rubric to assign a score of 0, 0.5, or 1.
+
+**Rubric:**
+- **Score 1 (Completely Correct):** The symbolic solution is entirely correct. It matches the ground truth solution, possibly with minor cosmetic differences in notation that do not change the meaning. The final expression must be mathematically equivalent.
+- **Score 0.5 (Partially Correct):** The solution is on the right track but contains some errors. This could be one or two missing, a wrong sign, or a minor miscalculation that doesn't completely invalidate the approach.
+- **Score 0 (Incorrect):** The solution is incorrect. It has more than two fundamental errors, and is quite off from the correct answer.
+
+**Problem:**
+{problem_statement}
+
+**Ground Truth Solution:**
+{ground_truth_solution}
+
+**Model-Generated Solution:**
+{model_generated_solution}
+
+**Evaluation:**
+1.  Carefully compare the model-generated solution with the ground truth solution.
+2.  Provide a step-by-step reasoning for your evaluation.
+3.  Finally, provide the score on a new line, in the format: "Score: [score]".
+
+**Your reasoning and score:** 
