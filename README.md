@@ -1,5 +1,3 @@
-# O3 Paper Converter
-
 This project contains a suite of tools to download physics papers from arXiv, convert their key findings into solvable problems, evaluate LLMs against these problems, and generate benchmark reports.
 
 ## Core Workflow
@@ -43,9 +41,9 @@ This script takes the filtered problems, gets solutions from the specified LLMs,
 *   `--models`: Specify which models to benchmark (e.g., `o3`, `gpt-4o`).
 *   `--limit`: Limit the number of problems to evaluate for a quick test.
 
-Example: Benchmark `o3` and `gpt-4o` on the first 10 problems.
+Example: Benchmark `o3` on the first 10 problems.
 ```bash
-python benchmark_llms.py --models o3 gpt-4o --limit 10
+python benchmark_llms.py --models o3 --limit 10
 ```
 
 ### Step 4: Generate a LaTeX Report

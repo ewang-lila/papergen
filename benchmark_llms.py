@@ -15,10 +15,11 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 SUPPORTED_MODELS = [
-    "4o",
+    "gpt-4o",
     "o4",
     "o3",
     "o3-mini",
+    "o4-mini"
     "claude-4",
     "gemini-2.5-pro",
 ]
@@ -26,7 +27,9 @@ SUPPORTED_MODELS = [
 JUDGE_MODEL = "gpt-4.1-mini"
 JUDGE_PROMPT_FILE = "judge_prompt.txt"
 
-MODEL_PROMPT = "You are an expert in physics. Solve the following problem carefully. There is one correct final answer to the problem. Provide your final answer inside a LaTeX \\boxed{} environment. \\n\\n"
+MODEL_PROMPT = """You are an expert in physics. You will be given a physics problem. 
+There is only one correct final answer to the problem. 
+Provide your final, simplified answer inside a LaTeX \\boxed{{}} environment. \\n\\n"""
 
 def extract_boxed_content(full_string: str):
     """
@@ -67,7 +70,7 @@ def get_model_response(model_name, problem_statement):
     Gets a response from the specified LLM.
     """
     try:
-        if model_name in ["o3", "o4", "gpt-4o"]:
+        if model_name in ["o3", "o4", "gpt-4o", "o4-mini", "o3-mini"]:
             params = {
                 "model": model_name,
                 "messages": [
@@ -105,7 +108,7 @@ def get_model_response(model_name, problem_statement):
                 model="gemini-2.5-pro",
                 contents=MODEL_PROMPT + problem_statement,
                 config=types.GenerateContentConfig(
-                    max_output_tokens=4096
+                    max_output_tokens=16000
                 )
             )
             return response.text
@@ -120,7 +123,7 @@ def get_judge_evaluation(problem_statement, ground_truth_solution, model_generat
         judge_prompt_template = f.read()
 
     prompt = judge_prompt_template.format(
-        problem_statement=problem_statement,
+        # problem_statement=problem_statement,
         ground_truth_solution=ground_truth_solution,
         model_generated_solution=model_generated_expression,
     )

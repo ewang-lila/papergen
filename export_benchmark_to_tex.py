@@ -23,6 +23,7 @@ TEX_TEMPLATE_HEADER = r"""
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{lmodern}
+\usepackage{fancyvrb}
 
 \geometry{a4paper, margin=1in}
 
@@ -104,10 +105,10 @@ def generate_problems_section(results_data):
             problems_tex += "\\paragraph*{Model Solution:}\n"
             problems_tex += f"{model_solution}\n\n"
             
-            # Judge evaluation is plain text and must be escaped
-            evaluation = escape_latex(output.get("evaluation", "No evaluation provided."))
+            # Judge evaluation is plain text and must be wrapped in Verbatim
+            evaluation = output.get("evaluation", "No evaluation provided.")
             problems_tex += "\\paragraph*{Judge's Evaluation:}\n"
-            problems_tex += f"\\begin{{quote}}\\ttfamily {evaluation}\\end{{quote}}\n\n"
+            problems_tex += f"\n{evaluation}\n\n"
             
         problems_tex += "\\newpage\n"
 

@@ -17,13 +17,15 @@ load_dotenv()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
+num_papers = 10
+
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
-    "physics.chem-ph",     # Chemical Physics
-    "math-ph.math-ph",      # Mathematical Physics
+    # "physics.chem-ph",     # Chemical Physics
+    "math-ph",      # Mathematical Physics
     "nlin.ao",
-    "cond-mat.soft",
-    "cond-mat.dis-nn"
+    # "cond-mat.soft",
+    # "cond-mat.dis-nn"
 
 ]
 
@@ -245,7 +247,7 @@ def main():
             downloaded_archives = downloaded_archives[:args.limit]
     else:
         print("Searching for and downloading new papers.")
-        downloaded_archives = search_and_download_papers(max_results_per_category=10)
+        downloaded_archives = search_and_download_papers(max_results_per_category=num_papers)
 
     for archive in downloaded_archives:
         print(f"Processing archive: {archive}")
