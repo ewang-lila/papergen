@@ -79,10 +79,10 @@ python refine_problems.py
 ```
 Specifying how much input data file to use: 
 ```bash
-python refine_problems.py --max-problems 2
+python refine_problems.py --max-problems 10
 ```
 
-### To do the benchmarking using the revised problems:
+Note that this will also create a json file with the critiques and updated problems at outputs/critiques. To do the benchmarking using the revised problems:
 ```bash
 python benchmark_llms.py --input-file output/revised_problems.json --output-file output/revised_benchmark_results.json
 ```
@@ -93,3 +93,10 @@ python export_benchmark_to_tex.py --benchmark-results-file output/revised_benchm
 ```
 
 Using the default commands from above will use all_papers_problems_filtered
+
+### Saving the critiques
+
+Use 
+```bash
+python export_critiques_to_tex.py
+```

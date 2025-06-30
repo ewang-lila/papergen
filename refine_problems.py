@@ -59,28 +59,13 @@ difficulty_critic = Agent(
     verbose=True
 )
 
-# 3. Concision Critic Agent
-concision_critic = Agent(
-    role="Problem Statement Concision Editor",
-    goal="Review a physics problem for excessive verbosity and suggest more concise phrasing. Provide feedback in a structured JSON format.",
-    backstory=(
-        "You are an experienced physics researcher whose goal is to decrease distracting information in problem statements."
-        "You will retain critical details and information in the problem statement but remove words that are absolutely unnecessary."
-    ),
-    llm=critic_llm,
-    allow_delegation=False,
-    verbose=True
-)
-
 # 4. Problem Refiner Agent
 problem_refiner = Agent(
     role="Physics Problem Editor and Refiner",
-    goal="Rewrite a physics problem to perfection by incorporating all feedback from three different critics (self-containment, difficulty, and concision).",
+    goal="Rewrite a physics problem to perfection by incorporating all feedback from two different critics (self-containment and difficulty).",
     backstory=(
-        "You are a master problem-crafter. Your talent lies in taking a rough problem draft "
-        "and, guided by expert critiques and the original source material, polishing it into a final, "
-        "flawless question. You will address every piece of feedback to produce a challenging, "
-        "self-contained, and concise problem."
+        "You are an expert in physics. You may receive feedback from two different critics about a physics problem. If they give you feedback, you must incorporate their suggestions and create a revised problem."
+        "If no feedback is given, do not change the problem."
     ),
     llm=refiner_llm,
     allow_delegation=False,
@@ -148,37 +133,13 @@ task_critique_difficulty = Task(
   agent=difficulty_critic
 )
 
-# Task for the Concision Critic
-task_critique_concision = Task(
-  description="""Review the physics research task below, which is designed to be as challenging as possible for a physics researcher.
-  Your ONLY goal is to ensure the problem statement does not contain unnecessary and distracting information.
-  Eliminate unnecessary inforamtion, verbose wording, and redundant information.
-
-  Provide your feedback as a JSON object with the following keys:
-  - "is_concise": boolean
-  - "critique": string (a brief, one-sentence summary of your findings)
-  - "issues": list of objects, where each object has:
-    - "finding": string (the specific text that is too verbose)
-    - "suggestion": string (a more concise way to phrase it)
-
-  If the problem is perfectly concise, "is_concise" should be true and "issues" should be an empty list. Only provide suggestions if the problem is currently unnecessarily verbose or distracting. 
-
-  Problem:
-  ---
-  Question: {problem_statement}
-  ---
-  """,
-  expected_output="A valid JSON object containing the fields 'is_concise', 'critique', and 'issues'.",
-  agent=concision_critic
-)
-
 # Task for the Refiner Agent
 task_refine_problem = Task(
-  description="""Your task is to refine a physics problem based on specific feedback from three expert critics.
+  description="""Your task is to refine a physics problem based on specific feedback from two expert critics.
   You must address every issue raised in the critiques you are provided, but only address the issues that are raised.
   Use the original paper text as a reference to ensure scientific accuracy, as well as the original problem and answer..
   The final output MUST be a JSON object with two keys: "problem_statement" and "final_solution". The answer must be the same as the original answer. You must also follow the the "Background:", "Task:", and "Solution:" template.
-  his is the template you must follow to provide the problem statement and solution:
+  This is the template you must follow to provide the problem statement and solution:
 
 
 
@@ -197,7 +158,7 @@ task_refine_problem = Task(
   """,
   expected_output="A single, valid JSON object with the keys 'Problem Statement and 'Final Solution. The 'Problem Statement should be the full, refined problem statement. The 'Final Solution should be the unchanged final solution from the original problem.",
   agent=problem_refiner,
-  context=[task_critique_self_containment, task_critique_difficulty, task_critique_concision]
+  context=[task_critique_self_containment, task_critique_difficulty]
 )
 
 def extract_and_combine_tex_files(archive_path):
@@ -250,6 +211,7 @@ def extract_and_combine_tex_files(archive_path):
 
 def main():
     os.makedirs("output", exist_ok=True)
+    os.makedirs("output/critiques", exist_ok=True)
     parser = argparse.ArgumentParser(description="Refine problems from a consolidated JSON file.")
     parser.add_argument(
         "--input-file",
@@ -276,6 +238,7 @@ def main():
         sys.exit(1)
 
     all_refined_papers = []
+    all_critiques = []
     total_problems_processed = 0
 
     for paper_data in all_papers_data:
@@ -312,34 +275,112 @@ def main():
             print(f"\n--- Refining Problem {i+1}/{len(paper_data['problems'])} for paper {paper_id} ---")
             print(f"Total problems processed so far: {total_problems_processed}")
 
-            refinement_crew = Crew(
-                agents=[self_containment_critic, difficulty_critic, concision_critic, problem_refiner],
-                tasks=[task_critique_self_containment, task_critique_difficulty, task_critique_concision, task_refine_problem],
-                verbose=True
-            )
-
             inputs = {
                 "problem_statement": problem["problem_statement"],
                 "final_solution": problem["final_solution"],
                 "paper_text": paper_text
             }
 
-            result = refinement_crew.kickoff(inputs=inputs)
+            # Execute critic tasks individually to capture their outputs
+            critiques = {}
+            
+            # Self-containment critique
+            try:
+                sc_crew = Crew(
+                    agents=[self_containment_critic],
+                    tasks=[task_critique_self_containment],
+                    verbose=False
+                )
+                sc_result = sc_crew.kickoff(inputs=inputs)
+                sc_str = str(sc_result.raw) if hasattr(sc_result, 'raw') else str(sc_result)
+                json_match = re.search(r'```json\n({.*?})\n```', sc_str, re.DOTALL)
+                if json_match:
+                    critiques["self_containment"] = json.loads(json_match.group(1))
+                else:
+                    critiques["self_containment"] = json.loads(sc_str)
+            except Exception as e:
+                print(f"Error in self-containment critique: {e}")
+                critiques["self_containment"] = {"error": "Failed to parse", "raw": str(e)}
+            
+            # Difficulty critique
+            try:
+                diff_crew = Crew(
+                    agents=[difficulty_critic],
+                    tasks=[task_critique_difficulty],
+                    verbose=False
+                )
+                diff_result = diff_crew.kickoff(inputs=inputs)
+                diff_str = str(diff_result.raw) if hasattr(diff_result, 'raw') else str(diff_result)
+                json_match = re.search(r'```json\n({.*?})\n```', diff_str, re.DOTALL)
+                if json_match:
+                    critiques["difficulty"] = json.loads(json_match.group(1))
+                else:
+                    critiques["difficulty"] = json.loads(diff_str)
+            except Exception as e:
+                print(f"Error in difficulty critique: {e}")
+                critiques["difficulty"] = {"error": "Failed to parse", "raw": str(e)}
+                
+            # Now run the refiner with all the tasks
+            refiner_crew = Crew(
+                agents=[self_containment_critic, difficulty_critic, problem_refiner],
+                tasks=[task_critique_self_containment, task_critique_difficulty, task_refine_problem],
+                verbose=True
+            )
+            refiner_result = refiner_crew.kickoff(inputs=inputs)
             
             try:
                 # Convert CrewOutput to string
-                result_str = str(result.raw) if hasattr(result, 'raw') else str(result)
+                result_str = str(refiner_result.raw) if hasattr(refiner_result, 'raw') else str(refiner_result)
                 
-                json_str_match = re.search(r'```json\n({.*})\n```', result_str, re.DOTALL)
+                # Try to extract JSON from markdown code block
+                json_str_match = re.search(r'```json\s*\n(.*?)\n```', result_str, re.DOTALL)
                 if json_str_match:
                     json_str = json_str_match.group(1)
+                    # Fix common JSON issues with LaTeX
+                    # Replace double backslashes with single for LaTeX commands
+                    json_str = json_str.replace('\\\\', '\\')
                     refined_problem = json.loads(json_str)
-                    refined_problems_for_paper.append(refined_problem)
                 else:
-                    refined_problems_for_paper.append(json.loads(result_str))
+                    # Try parsing the entire string as JSON
+                    refined_problem = json.loads(result_str)
+                
+                # Ensure we have the expected keys
+                if "problem_statement" not in refined_problem and "question" in refined_problem:
+                    refined_problem["problem_statement"] = refined_problem["question"]
+                if "final_solution" not in refined_problem and "answer" in refined_problem:
+                    refined_problem["final_solution"] = refined_problem["answer"]
+                    
+                refined_problems_for_paper.append(refined_problem)
+                    
+                # Save critique data
+                critique_entry = {
+                    "paper_id": paper_id,
+                    "problem_index": i,
+                    "original_problem": {
+                        "problem_statement": problem["problem_statement"],
+                        "final_solution": problem["final_solution"]
+                    },
+                    "critiques": critiques,
+                    "refined_problem": refined_problem
+                }
+                all_critiques.append(critique_entry)
+                    
             except (json.JSONDecodeError, AttributeError) as e:
                 print(f"Warning: Could not parse final JSON output for problem. Storing raw output.")
                 refined_problems_for_paper.append({"error": "failed to parse output", "raw_output": result_str})
+                
+                # Still save critique data even if refinement failed
+                critique_entry = {
+                    "paper_id": paper_id,
+                    "problem_index": i,
+                    "original_problem": {
+                        "problem_statement": problem["problem_statement"],
+                        "final_solution": problem["final_solution"]
+                    },
+                    "critiques": critiques,
+                    "refined_problem": {"error": "failed to parse output", "raw_output": result_str}
+                }
+                all_critiques.append(critique_entry)
             
             total_problems_processed += 1
         
@@ -354,7 +395,13 @@ def main():
     with open(output_filename, 'w', encoding='utf-8') as f:
         json.dump(all_refined_papers, f, indent=4, ensure_ascii=False)
 
+    # Save all critiques to a file
+    critiques_filename = "output/critiques/all_critiques.json"
+    with open(critiques_filename, 'w', encoding='utf-8') as f:
+        json.dump(all_critiques, f, indent=4, ensure_ascii=False)
+
     print(f"\nAll papers processed. Refined problems saved to {output_filename}")
+    print(f"Critiques saved to {critiques_filename}")
 
 
 if __name__ == '__main__':

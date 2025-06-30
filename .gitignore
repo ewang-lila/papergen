@@ -26,3 +26,7 @@ output/tex_outputs/*
 
 # Include .tex files in output/ directory
 !output/*.tex
+
+# Include critiques directory and its JSON files
+!output/critiques/
+!output/critiques/*.json
