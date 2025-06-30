@@ -16,3 +16,13 @@ output/tex_exports/
 
 # Ignore other generated HTML output
 output.html
+.aux
+.log
+
+# Ignore everything in tex_outputs except .tex and .pdf files
+output/tex_outputs/*
+!output/tex_outputs/*.tex
+!output/tex_outputs/*.pdf
+
+# Include .tex files in output/ directory
+!output/*.tex

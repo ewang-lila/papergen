@@ -70,3 +70,26 @@ pdflatex -output-directory=output output/solutions_report.tex
     ANTHROPIC_API_KEY="your_anthropic_api_key"
     GOOGLE_API_KEY="your_google_api_key"
     ```
+
+### Now important: run the refinement agent
+
+Default: 
+```bash
+python refine_problems.py
+```
+Specifying how much input data file to use: 
+```bash
+python refine_problems.py --max-problems 2
+```
+
+### To do the benchmarking using the revised problems:
+```bash
+python benchmark_llms.py --input-file output/revised_problems.json --output-file output/revised_benchmark_results.json
+```
+
+Then, export the revised benchmark results to LaTeX
+```bash
+python export_benchmark_to_tex.py --benchmark-results-file output/revised_benchmark_results.json --output-tex-file output/revised_solutions_report.tex
+```
+
+Using the default commands from above will use all_papers_problems_filtered

@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import argparse
 
 BENCHMARK_RESULTS_FILE = "output/benchmark_results.json"
 OUTPUT_TEX_FILE = "output/solutions_report.tex"
@@ -115,15 +116,15 @@ def generate_problems_section(results_data):
     return problems_tex
 
 
-def export_benchmark_to_tex():
+def export_benchmark_to_tex(benchmark_results_file, output_tex_file):
     """
     Reads benchmark results and generates a LaTeX report.
     """
-    if not os.path.exists(BENCHMARK_RESULTS_FILE):
-        print(f"Error: Benchmark results file not found at '{BENCHMARK_RESULTS_FILE}'")
+    if not os.path.exists(benchmark_results_file):
+        print(f"Error: Benchmark results file not found at '{benchmark_results_file}'")
         return
 
-    with open(BENCHMARK_RESULTS_FILE, 'r', encoding='utf-8') as f:
+    with open(benchmark_results_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
     # Generate content
@@ -137,11 +138,16 @@ def export_benchmark_to_tex():
     final_tex += TEX_TEMPLATE_FOOTER
 
     # Write to file
-    with open(OUTPUT_TEX_FILE, 'w', encoding='utf-8') as f:
+    with open(output_tex_file, 'w', encoding='utf-8') as f:
         f.write(final_tex)
 
-    print(f"LaTeX report successfully generated at '{OUTPUT_TEX_FILE}'")
+    print(f"LaTeX report successfully generated at '{output_tex_file}'")
     print("You can now compile this file using a LaTeX distribution (like pdflatex) to create a PDF.")
 
 if __name__ == "__main__":
-    export_benchmark_to_tex() 
+    parser = argparse.ArgumentParser(description="Export benchmark results to LaTeX")
+    parser.add_argument("--benchmark-results-file", type=str, default=BENCHMARK_RESULTS_FILE, help="Path to the benchmark results file")
+    parser.add_argument("--output-tex-file", type=str, default=OUTPUT_TEX_FILE, help="Path to the output LaTeX file")
+    args = parser.parse_args()
+
+    export_benchmark_to_tex(args.benchmark_results_file, args.output_tex_file) 

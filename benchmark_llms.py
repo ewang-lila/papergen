@@ -60,7 +60,7 @@ def extract_boxed_content(full_string: str):
     except Exception:
         return None
 
-def load_problems(filename="output/all_papers_problems_filtered.json"):
+def load_problems(filename):
     """Loads problems from the specified JSON file."""
     with open(filename, 'r') as f:
         return json.load(f)
@@ -202,6 +202,12 @@ def main():
         help="Limit the number of problems to evaluate."
     )
     parser.add_argument(
+        "--input-file",
+        type=str,
+        default="output/all_papers_problems_filtered.json",
+        help="Path to the JSON file with problems to benchmark."
+    )
+    parser.add_argument(
         "--output-file",
         type=str,
         default="output/benchmark_results.json",
@@ -209,7 +215,7 @@ def main():
     )
     args = parser.parse_args()
 
-    papers = load_problems()
+    papers = load_problems(args.input_file)
     results = []
 
     all_problems = []

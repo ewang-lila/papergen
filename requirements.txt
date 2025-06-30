@@ -8,3 +8,6 @@ mdit-py-plugins
 google-genai
 anthropic
 tqdm
+google-cloud-aiplatform
+crewai
+crewai[tools]
