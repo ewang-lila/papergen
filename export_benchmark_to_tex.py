@@ -86,7 +86,21 @@ def generate_problems_section(results_data):
         problems_tex += f"{problem_statement}\n\n"
         
         problems_tex += "\\subsubsection*{Ground Truth Solution}\n"
-        problems_tex += f"\\[ \\boxed{{{ground_truth_solution}}} \\]\n\n"
+        # Handle the ground truth solution more carefully
+        if ground_truth_solution.strip():
+            solution = ground_truth_solution.strip()
+            
+            # Special handling for the truncated solution in problem 8
+            if "and where all functional derivatives" in solution and solution.endswith("\\boldsymbol{B"):
+                solution += ")} \\]"
+            
+            # If the solution already contains \boxed, don't double-box it
+            if "\\boxed{" in solution:
+                problems_tex += f"\\[ {solution} \\]\n\n"
+            else:
+                problems_tex += f"\\[ \\boxed{{{solution}}} \\]\n\n"
+        else:
+            problems_tex += "No ground truth solution provided.\n\n"
         
         problems_tex += "\\subsubsection*{Model Outputs}\n"
         
@@ -101,12 +115,17 @@ def generate_problems_section(results_data):
             
             problems_tex += f"\\subsubsection*{{Model: {escape_latex(model_name)} (Score: {score_str})}}\n"
             
-            # Model solution may contain LaTeX, so it's not escaped
+            # Model solution may contain LaTeX, so wrap it in math mode if needed
             model_solution = output.get("solution", "No solution provided.")
             problems_tex += "\\paragraph*{Model Solution:}\n"
-            problems_tex += f"{model_solution}\n\n"
+            # Check if the solution looks like it should be in math mode
+            if model_solution.strip() and not model_solution.strip().startswith("No solution"):
+                # Wrap in display math mode
+                problems_tex += f"\\[ {model_solution} \\]\n\n"
+            else:
+                problems_tex += f"{model_solution}\n\n"
             
-            # Judge evaluation is plain text and must be wrapped in Verbatim
+            # Judge evaluation is plain text
             evaluation = output.get("evaluation", "No evaluation provided.")
             problems_tex += "\\paragraph*{Judge's Evaluation:}\n"
             problems_tex += f"\n{evaluation}\n\n"
