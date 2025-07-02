@@ -19,7 +19,7 @@ SUPPORTED_MODELS = [
     "o4",
     "o3",
     "o3-mini",
-    "o4-mini"
+    "o4-mini",
     "claude-4",
     "gemini-2.5-pro",
 ]
@@ -204,7 +204,7 @@ def main():
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/all_papers_problems_filtered.json",
+        default="output/revised_problems.json",
         help="Path to the JSON file with problems to benchmark."
     )
     parser.add_argument(

@@ -381,12 +381,14 @@ def main():
                 print(f"Error in difficulty critique: {e}")
                 critiques["difficulty"] = {"error": str(e)}
             
-            # Check if the problem should be removed
-            should_remove = critiques.get("difficulty", {}).get("should_remove", False)
-            if should_remove:
-                print(f"Problem marked for removal: insufficient paper content to improve difficulty")
+            # Check if the problem is trivial and should be removed
+            is_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", True)  # Default to non-trivial (don't remove)
+
+            if not is_non_trivial:
+                critique_text = critiques.get("difficulty", {}).get("critique", "No critique provided.")
+                print(f"Problem marked for removal: problem is trivial. Critique: {critique_text}")
                 total_problems_removed += 1
-                
+
                 critique_entry = {
                     "paper_id": paper_id,
                     "problem_index": i,
@@ -396,7 +398,7 @@ def main():
                     },
                     "critiques": critiques,
                     "removed": True,
-                    "removal_reason": "Trivial problem with insufficient paper content for improvement"
+                    "removal_reason": f"Trivial problem: {critique_text}"
                 }
                 all_critiques.append(critique_entry)
                 total_problems_processed += 1
