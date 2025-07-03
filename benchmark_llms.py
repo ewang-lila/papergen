@@ -204,13 +204,13 @@ def main():
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/revised_problems.json",
+        default="output/problems/revised_problems.json",
         help="Path to the JSON file with problems to benchmark."
     )
     parser.add_argument(
         "--output-file",
         type=str,
-        default="output/benchmark_results.json",
+        default="output/results/benchmark_results.json",
         help="File to save the benchmark results."
     )
     args = parser.parse_args()
@@ -218,10 +218,13 @@ def main():
     # Dynamically set output filename based on models chosen
     if len(args.models) == 1:
         model_name = args.models[0].replace("openai/", "").replace("/", "-")
-        args.output_file = f"output/benchmark_results_{model_name}.json"
+        output_dir = f"output/results/{model_name}"
+        os.makedirs(output_dir, exist_ok=True)
+        args.output_file = f"{output_dir}/benchmark_results_{model_name}.json"
     else:
-        # For multiple models, use a generic filename
-        args.output_file = "output/benchmark_results.json"
+        # For multiple models, use a generic filename in the root of results
+        os.makedirs("output/results", exist_ok=True)
+        args.output_file = "output/results/benchmark_results.json"
 
     papers = load_problems(args.input_file)
     results = []

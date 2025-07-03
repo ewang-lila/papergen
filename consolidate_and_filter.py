@@ -3,8 +3,8 @@ import glob
 import os
 import re
 
-RAW_OUTPUT_DIR = "output/raw_json_outputs"
-FILTERED_OUTPUT_FILENAME = "output/all_papers_problems_filtered.json"
+RAW_OUTPUT_DIR = "output/papers/initial_QA_pairs"
+FILTERED_OUTPUT_FILENAME = "output/problems/all_papers_problems_filtered.json"
 
 def consolidate_and_filter():
     """

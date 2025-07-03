@@ -257,7 +257,6 @@ def parse_json_output(output_str):
 # --- Main Execution ---
 
 def main():
-    os.makedirs("output", exist_ok=True)
     os.makedirs("output/critiques", exist_ok=True)
     os.makedirs("output/critiques/debug", exist_ok=True)
     
@@ -265,7 +264,7 @@ def main():
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/all_papers_problems_filtered.json",
+        default="output/problems/all_papers_problems_filtered.json",
         help="Path to the consolidated JSON file with problems to refine."
     )
     parser.add_argument(
@@ -493,7 +492,7 @@ def main():
             })
 
     # Save all refined problems to a single file
-    output_filename = "output/revised_problems.json"
+    output_filename = "output/problems/revised_problems.json"
     with open(output_filename, 'w', encoding='utf-8') as f:
         json.dump(all_refined_papers, f, indent=4, ensure_ascii=False)
 

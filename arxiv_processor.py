@@ -25,12 +25,12 @@ ARXIV_CATEGORIES = [
     "math-ph",      # Mathematical Physics
     "nlin.ao",
     # "cond-mat.soft",
-    # "cond-mat.dis-nn"
+    "cond-mat.dis-nn"
 
 ]
 
-DOWNLOAD_DIR = "output/arxiv_papers"
-OUTPUT_DIR = "output/raw_json_outputs"
+DOWNLOAD_DIR = "output/papers/arxiv_papers"
+OUTPUT_DIR = "output/papers/initial_QA_pairs"
 
 def setup_directories():
     """Creates the necessary directories if they don't exist."""

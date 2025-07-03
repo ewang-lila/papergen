@@ -301,7 +301,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output-tex-file", 
         type=str, 
-        default="output/critiques_report.tex", 
+        default="output/critiques/critiques_report.tex", 
         help="Path to the output LaTeX file"
     )
     args = parser.parse_args()

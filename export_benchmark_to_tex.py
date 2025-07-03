@@ -96,13 +96,13 @@ def generate_summary_table(summary_data):
     return table_header + table_rows + table_footer
 
 
-def generate_problem_parts(results_data, output_dir, model_name, num_files=5):
+def generate_problem_parts(results_data, base_tex_dir, num_files=5):
     """Generates LaTeX for detailed problems, split into multiple files."""
     if not results_data:
         return []
 
-    problems_dir_name = f"problems_{model_name}"
-    problems_dir = os.path.join(output_dir, problems_dir_name)
+    problems_dir_name = "problem_parts"
+    problems_dir = os.path.join(base_tex_dir, problems_dir_name)
     os.makedirs(problems_dir, exist_ok=True)
 
     problems_per_file = math.ceil(len(results_data) / num_files)
@@ -181,11 +181,14 @@ def export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name)
     with open(benchmark_results_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
-    output_dir = os.path.dirname(output_tex_file)
+    base_tex_dir = os.path.dirname(output_tex_file)
+
+    pdf_dir = os.path.join(os.path.dirname(base_tex_dir), "pdf")
+    os.makedirs(pdf_dir, exist_ok=True)
 
     # Generate content
     summary_table_tex = generate_summary_table(data.get("summary", {}))
-    problem_files = generate_problem_parts(data.get("results", []), output_dir, model_name, num_files=5)
+    problem_files = generate_problem_parts(data.get("results", []), base_tex_dir, num_files=5)
 
     # Combine all parts
     final_tex = TEX_TEMPLATE_HEADER
@@ -201,10 +204,15 @@ def export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name)
         f.write(final_tex)
 
     print(f"LaTeX report successfully generated at '{output_tex_file}'")
-    print("The report is split into the following files:")
-    for pf in problem_files:
-        print(f"  - {os.path.join(output_dir, pf)}")
-    print("You can now compile the main file using a LaTeX distribution (like pdflatex) to create a PDF.")
+    problem_parts_dir = os.path.join(base_tex_dir, 'problem_parts')
+    print("The report is split into multiple parts in:")
+    print(f"  - {problem_parts_dir}")
+    
+    main_tex_file_rel_path = os.path.relpath(output_tex_file, os.getcwd())
+    pdf_dir_rel_path = os.path.relpath(pdf_dir, os.getcwd())
+    print("\nYou can now compile the main file using a LaTeX distribution to create a PDF:")
+    print(f"pdflatex -output-directory={pdf_dir_rel_path} {main_tex_file_rel_path}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export benchmark results to LaTeX")
@@ -217,7 +225,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model_name = args.model.replace("openai/", "").replace("/", "-")
-    benchmark_results_file = f"output/benchmark_results_{model_name}.json"
-    output_tex_file = f"output/solutions_report_{model_name}.tex"
+    model_results_dir = f"output/results/{model_name}"
+
+    benchmark_results_file = f"{model_results_dir}/benchmark_results_{model_name}.json"
+    
+    tex_dir = os.path.join(model_results_dir, "tex")
+    os.makedirs(tex_dir, exist_ok=True)
+    
+    output_tex_file = os.path.join(tex_dir, f"solutions_report_{model_name}.tex")
 
     export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name) 
