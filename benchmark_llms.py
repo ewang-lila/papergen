@@ -215,6 +215,14 @@ def main():
     )
     args = parser.parse_args()
 
+    # Dynamically set output filename based on models chosen
+    if len(args.models) == 1:
+        model_name = args.models[0].replace("openai/", "").replace("/", "-")
+        args.output_file = f"output/benchmark_results_{model_name}.json"
+    else:
+        # For multiple models, use a generic filename
+        args.output_file = "output/benchmark_results.json"
+
     papers = load_problems(args.input_file)
     results = []
 
