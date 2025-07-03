@@ -11,6 +11,23 @@ def escape_latex(text):
         return ""
     return re.sub(r'([&%$#_{}])', r'\\\1', text)
 
+def format_tex_display_math(text):
+    """
+    Formats a string for LaTeX display math, removing existing delimiters.
+    """
+    if not isinstance(text, str):
+        return ""
+    
+    text = text.strip()
+    
+    # More robustly remove existing math delimiters using regex
+    text = re.sub(r'^\\\[(.*)\\\]$', r'\1', text).strip() # unwrap \[...\]
+    text = re.sub(r'^\\\((.*)\\\)$', r'\1', text).strip() # unwrap \(...\)
+    text = re.sub(r'^\$\$(.*)\$\$$', r'\1', text).strip() # unwrap $$...$$
+    text = re.sub(r'^\$(.*)\$$', r'\1', text).strip()     # unwrap $...$
+        
+    return f"\\[ {text} \\]"
+
 TEX_TEMPLATE_HEADER = r"""
 \documentclass[10pt]{article}
 \usepackage[utf8]{inputenc}
@@ -43,12 +60,13 @@ def generate_summary_table(critiques_data):
     """Generates summary statistics from the critiques."""
     stats = {
         "self_containment": {"pass": 0, "fail": 0},
-        "difficulty": {"pass": 0, "fail": 0},
+        "difficulty": {"pass": 0, "fail": 0, "removed": 0},
         "refinement": {"success": 0, "fail": 0}
     }
     
     for critique_entry in critiques_data:
         critiques = critique_entry.get("critiques", {})
+        is_removed = critique_entry.get("removed", False)
         
         # Check self-containment
         if "self_containment" in critiques and isinstance(critiques["self_containment"], dict):
@@ -59,25 +77,28 @@ def generate_summary_table(critiques_data):
         
         # Check difficulty
         if "difficulty" in critiques and isinstance(critiques["difficulty"], dict):
-            if critiques["difficulty"].get("is_non_trivial", False):
+            if is_removed:
+                stats["difficulty"]["removed"] += 1
+            elif critiques["difficulty"].get("is_non_trivial", False):
                 stats["difficulty"]["pass"] += 1
             else:
                 stats["difficulty"]["fail"] += 1
         
-        # Check refinement success
-        refined = critique_entry.get("refined_problem", {})
-        if isinstance(refined, dict) and "error" not in refined:
-            stats["refinement"]["success"] += 1
-        else:
-            stats["refinement"]["fail"] += 1
+        # Check refinement success (only for non-removed problems)
+        if not is_removed:
+            refined = critique_entry.get("refined_problem", {})
+            if isinstance(refined, dict) and "error" not in refined:
+                stats["refinement"]["success"] += 1
+            else:
+                stats["refinement"]["fail"] += 1
     
     # Generate summary table
     summary_tex = r"""
 \section*{Summary Statistics}
 \begin{center}
-\begin{longtable}{|l|c|c|c|}
+\begin{longtable}{|l|c|c|c|c|}
 \hline
-\textbf{Critique Type} & \textbf{Pass} & \textbf{Fail} & \textbf{Pass Rate} \\
+\textbf{Critique Type} & \textbf{Pass} & \textbf{Fail} & \textbf{Removed} & \textbf{Pass Rate} \\
 \hline
 \endfirsthead
 \hline
@@ -89,15 +110,17 @@ def generate_summary_table(critiques_data):
             type_name = "Refinement Success"
             pass_count = counts["success"]
             fail_count = counts["fail"]
+            removed_count = 0
         else:
             type_name = escape_latex(critique_type.replace("_", " ").title())
             pass_count = counts["pass"]
             fail_count = counts["fail"]
+            removed_count = counts.get("removed", 0)
         
-        total = pass_count + fail_count
+        total = pass_count + fail_count + removed_count
         pass_rate = f"{(pass_count / total * 100):.1f}\\%" if total > 0 else "N/A"
         
-        summary_tex += f"{type_name} & {pass_count} & {fail_count} & {pass_rate} \\\\\n"
+        summary_tex += f"{type_name} & {pass_count} & {fail_count} & {removed_count} & {pass_rate} \\\\\n"
     
     summary_tex += r"""\hline
 \end{longtable}
@@ -165,7 +188,18 @@ def generate_critiques_section(critiques_data):
         
         critiques_tex += "\\subsubsection*{Original Solution}\n"
         final_solution = original.get('final_solution', 'No solution')
-        critiques_tex += f"\\[ \\boxed{{{final_solution}}} \\]\n\n"
+        
+        # Fix for multi-line boxed commands: ensure they're on one line
+        if '\\boxed{' in final_solution:
+            # Check if the boxed command spans multiple lines
+            if final_solution.count('{') != final_solution.count('}'):
+                # Try to fix by adding missing braces
+                open_count = final_solution.count('{')
+                close_count = final_solution.count('}')
+                if open_count > close_count:
+                    final_solution += '}' * (open_count - close_count)
+        
+        critiques_tex += f"{format_tex_display_math(final_solution)}\n\n"
         
         # Critiques
         critiques_tex += "\\subsubsection*{Critiques}\n"
@@ -186,22 +220,43 @@ def generate_critiques_section(critiques_data):
         
         # Refined problem
         refined = critique_entry.get("refined_problem", {})
-        critiques_tex += "\\subsubsection*{Refined Problem}\n"
+        is_removed = critique_entry.get("removed", False)
+        included_in_dataset = critique_entry.get("included_in_dataset", True)
         
-        if isinstance(refined, dict) and "error" not in refined:
-            # Handle different possible keys for the problem statement
-            problem_key = "problem_statement" if "problem_statement" in refined else "question"
-            solution_key = "final_solution" if "final_solution" in refined else "answer"
-            
-            critiques_tex += "\\paragraph*{Refined Problem Statement:}\n"
-            refined_problem = refined.get(problem_key, 'No refined problem statement')
-            critiques_tex += f"{refined_problem}\n\n"
-            
-            critiques_tex += "\\paragraph*{Refined Solution:}\n"
-            refined_solution = refined.get(solution_key, 'No solution')
-            critiques_tex += f"\\[ \\boxed{{{refined_solution}}} \\]\n\n"
+        if is_removed:
+            critiques_tex += "\\subsubsection*{Problem Status}\n"
+            critiques_tex += "\\textcolor{fail}{\\textbf{REMOVED: " + escape_latex(critique_entry.get("removal_reason", "Marked for removal")) + "}}\n\n"
+        elif not included_in_dataset:
+            critiques_tex += "\\subsubsection*{Problem Status}\n"
+            critiques_tex += "\\textcolor{fail}{\\textbf{EXCLUDED: Trivial problem - refinement failed}}\n\n"
         else:
-            critiques_tex += "\\textcolor{fail}{\\textbf{Error refining problem}}\n\n"
+            critiques_tex += "\\subsubsection*{Refined Problem}\n"
+            
+            if isinstance(refined, dict) and "error" not in refined:
+                # Handle different possible keys for the problem statement
+                problem_key = "problem_statement" if "problem_statement" in refined else "question"
+                solution_key = "final_solution" if "final_solution" in refined else "answer"
+                
+                critiques_tex += "\\paragraph*{Refined Problem Statement:}\n"
+                refined_problem = refined.get(problem_key, 'No refined problem statement')
+                critiques_tex += f"{refined_problem}\n\n"
+                
+                critiques_tex += "\\paragraph*{Refined Solution:}\n"
+                refined_solution = refined.get(solution_key, 'No solution')
+                
+                # Fix for multi-line boxed commands in refined solution too
+                if '\\boxed{' in refined_solution:
+                    # Check if the boxed command spans multiple lines
+                    if refined_solution.count('{') != refined_solution.count('}'):
+                        # Try to fix by adding missing braces
+                        open_count = refined_solution.count('{')
+                        close_count = refined_solution.count('}')
+                        if open_count > close_count:
+                            refined_solution += '}' * (open_count - close_count)
+                
+                critiques_tex += f"{format_tex_display_math(refined_solution)}\n\n"
+            else:
+                critiques_tex += "\\textcolor{fail}{\\textbf{Error refining problem}}\n\n"
         
         critiques_tex += "\\newpage\n"
     
@@ -246,7 +301,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output-tex-file", 
         type=str, 
-        default="output/critiques_report.tex", 
+        default="output/critiques/critiques_report.tex", 
         help="Path to the output LaTeX file"
     )
     args = parser.parse_args()

@@ -19,7 +19,7 @@ SUPPORTED_MODELS = [
     "o4",
     "o3",
     "o3-mini",
-    "o4-mini"
+    "o4-mini",
     "claude-4",
     "gemini-2.5-pro",
 ]
@@ -204,16 +204,27 @@ def main():
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/all_papers_problems_filtered.json",
+        default="output/problems/revised_problems.json",
         help="Path to the JSON file with problems to benchmark."
     )
     parser.add_argument(
         "--output-file",
         type=str,
-        default="output/benchmark_results.json",
+        default="output/results/benchmark_results.json",
         help="File to save the benchmark results."
     )
     args = parser.parse_args()
+
+    # Dynamically set output filename based on models chosen
+    if len(args.models) == 1:
+        model_name = args.models[0].replace("openai/", "").replace("/", "-")
+        output_dir = f"output/results/{model_name}"
+        os.makedirs(output_dir, exist_ok=True)
+        args.output_file = f"{output_dir}/benchmark_results_{model_name}.json"
+    else:
+        # For multiple models, use a generic filename in the root of results
+        os.makedirs("output/results", exist_ok=True)
+        args.output_file = "output/results/benchmark_results.json"
 
     papers = load_problems(args.input_file)
     results = []

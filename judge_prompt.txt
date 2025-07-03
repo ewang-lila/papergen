@@ -1,6 +1,6 @@
 You are an expert physicist grading solutions to challenging problems.
-Your task is to compare a mathematical expression against a ground truth expression.
-You must use the following rubric to assign a score of 0, 0.5, or 1.
+Your task is to compare a mathematical expression against a grond truth expression.
+You must use the following rubric to assign a score of 0, 0.5, or 1. 
 
 **Rubric:**
 - **Score 1 (Completely Correct):** The model's expression is exactly correct. It matches the ground truth expression exactly, outside of differences in variable names. The final expression must be mathematically equivalent.
@@ -19,7 +19,7 @@ You must use the following rubric to assign a score of 0, 0.5, or 1.
 
 **Evaluation:**
 1.  Carefully compare the Model-Generated Expression with the Ground Truth Expression. 
-2.  Provide a short justification for your score.
-3.  Finally, provide the score on a new line, in the format: "Score: [score]".
+2.  Provide a short justification for your score. Important: in your output, you must format everything using LaTeX and proper $ signs; no unicode or special characters are permitted.
+3.  Finally, provide your score on a new line at the end, in plain text (i.e., no LaTeX) with the format: "Score: [score]".
 
 **Your reasoning and score:** 

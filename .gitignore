@@ -5,28 +5,38 @@
 __pycache__/
 *.pyc
 
-# Generated data directories (inside the new 'output' parent directory)
-output/arxiv_papers/
-output/raw_json_outputs/
-output/tex_exports/
+# LaTeX auxiliary files (globally ignore)
+*.aux
+*.log
+*.fdb_latexmk
+*.fls
+*.gz
 
-# Explicitly track these files within the output directory
-!output/all_papers_problems.json
-!output/all_papers_problems_filtered.json
+# Ignore all contents of 'output/' by default
+output/*
+
+# Explicitly re-include specific top-level directories within output/
+!output/problems/
+!output/results/
+!output/critiques/
+!output/papers/
+
+# For 'problems' directory, track only JSON files
+output/problems/*
+!output/problems/*.json
+
+# For 'results' directory, track JSONs, TEX, and PDF files recursively
+output/results/*
+!output/results/**/*.json
+!output/results/**/*.tex
+!output/results/**/*.pdf
+
+# For 'critiques' and 'papers' directories, ignore all their contents recursively
+output/critiques/**
+output/papers/**
 
 # Ignore other generated HTML output
 output.html
-.aux
-.log
 
-# Ignore everything in tex_outputs except .tex and .pdf files
-output/tex_outputs/*
-!output/tex_outputs/*.tex
-!output/tex_outputs/*.pdf
-
-# Include .tex files in output/ directory
-!output/*.tex
-
-# Include critiques directory and its JSON files
-!output/critiques/
-!output/critiques/*.json
+# Ignore all 'tex_outputs' directories, which contain temporary compilation files
+**/tex_outputs/

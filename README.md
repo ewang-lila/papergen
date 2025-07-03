@@ -5,14 +5,14 @@ This project contains a suite of tools to download physics papers from arXiv, co
 The project is designed to be run as a sequential pipeline. Here is the recommended workflow:
 
 ### Step 1: Generate Problems from Papers
-First, download papers from arXiv and use an LLM to generate problems from their content. The script saves one JSON file per paper in `output/raw_json_outputs/`.
+First, download papers from arXiv and use an LLM to generate problems from their content. The script saves one JSON file per paper in `output/papers/initial_QA_pairs/` and downloads raw arXiv papers to `output/papers/arxiv_papers/`.
 
 ```bash
 python arxiv_processor.py
 ```
 
 **Common Options:**
-- `--no-download`: Use this flag to skip downloading and process papers already present in `output/arxiv_papers/`.
+- `--no-download`: Use this flag to skip downloading and process papers already present in `output/papers/arxiv_papers/`.
 - `--limit <N>`: When used with `--no-download`, this will only process the first `N` papers found locally.
 - `--model <model_name>`: Choose the model for problem generation (e.g., `gemini` or `o3`).
 
@@ -27,35 +27,79 @@ Next, combine the many individual JSON files into a single, clean master file. T
 ```bash
 python consolidate_and_filter.py
 ```
-This script reads all files from `output/raw_json_outputs/`, filters them, and creates a single clean dataset at `output/all_papers_problems_filtered.json`.
+This script reads all files from `output/papers/initial_QA_pairs/`, filters them, and creates a single clean dataset at `output/problems/all_papers_problems_filtered.json`.
 
-### Step 3: Benchmark LLMs
-Evaluate the performance of different LLMs on the set of filtered problems.
+### Step 3: Refine Problems with a Critic Agent
+Refine the generated problems for self-containment and difficulty using a critic agent. This step also generates critiques and revised problems.
+
+Default: 
+```bash
+python refine_problems.py
+```
+Specifying how much input data file to use: 
+```bash
+python refine_problems.py --max-problems 10
+```
+
+This will create a JSON file with the critiques at `output/critiques/all_critiques.json` and updated problems at `output/problems/revised_problems.json`.
+
+### Step 4: Benchmark LLMs
+Evaluate the performance of different LLMs on the set of filtered or refined problems.
 
 ```bash
 python benchmark_llms.py
 ```
-This script takes the filtered problems, gets solutions from the specified LLMs, uses a judge model to score them, and saves the detailed results to `output/benchmark_results.json`.
+This script takes the filtered problems (by default from `output/problems/revised_problems.json`), gets solutions from the specified LLMs, uses a judge model to score them, and saves the detailed results to `output/results/benchmark_results_{model_name}.json` or `output/results/benchmark_results.json`.
 
 **Common Options:**
 *   `--models`: Specify which models to benchmark (e.g., `o3`, `gpt-4o`).
 *   `--limit`: Limit the number of problems to evaluate for a quick test.
+*   `--input-file`: Specify an alternative input problem file, e.g., `output/problems/all_papers_problems_filtered.json`.
 
-Example: Benchmark `o3` on the first 10 problems.
+Example: Benchmark `o3` on the first 10 problems using revised problems.
 ```bash
-python benchmark_llms.py --models o3 --limit 10
+python benchmark_llms.py --models o3 --limit 10 --input-file output/problems/revised_problems.json
 ```
 
-### Step 4: Generate a LaTeX Report
+### Step 5: Generate a LaTeX Report for Solutions
 Create a high-quality, human-readable report from the benchmark results.
 
 ```bash
-python export_benchmark_to_tex.py
+python export_benchmark_to_tex.py --model <model_name>
 ```
-This script reads `output/benchmark_results.json` and generates a comprehensive LaTeX file at `output/solutions_report.tex`. You can then compile this into a PDF using any LaTeX distribution (e.g., `pdflatex`):
+This script reads `output/results/{model_name}/benchmark_results_{model_name}.json` and generates a comprehensive LaTeX file at `output/results/{model_name}/tex/solutions_report_{model_name}.tex`. The report is split into multiple subfiles (e.g., `problems_part_1.tex`) in a `output/results/{model_name}/tex/problem_parts/` subdirectory, which are then included in the main report.
+
+You can then compile the main `.tex` file into a PDF using any LaTeX distribution (e.g., `pdflatex`):
 ```bash
-pdflatex -output-directory=output output/solutions_report.tex
+pdflatex -output-directory=output/results/{model_name}/pdf output/results/{model_name}/tex/solutions_report_{model_name}.tex
 ```
+
+### Step 6: Generate a LaTeX Report for Critiques
+Generate a LaTeX report detailing the critiques from the problem refinement process.
+
+```bash
+python export_critiques_to_tex.py
+```
+This script reads `output/critiques/all_critiques.json` and generates a LaTeX file at `output/critiques/critiques_report.tex`.
+
+## Directory Structure
+
+-   `output/`:
+    -   `papers/`: Contains raw data from arXiv.
+        -   `arxiv_papers/`: Downloaded `.tar.gz` files.
+        -   `initial_QA_pairs/`: Raw JSON files with problems generated by `arxiv_processor.py`.
+    -   `problems/`: Stores processed problem sets.
+        -   `all_papers_problems_filtered.json`: Consolidated and filtered problems from `consolidate_and_filter.py`.
+        -   `revised_problems.json`: Problems refined by `refine_problems.py`.
+    -   `critiques/`: Contains all files related to the problem refinement process.
+        -   `all_critiques.json`: Consolidated critiques from `refine_problems.py`.
+        -   `debug/`: Debugging information for critiques.
+        -   `critiques_report.tex`: LaTeX report of critiques generated by `export_critiques_to_tex.py`.
+    -   `results/`: Stores benchmark results and solution reports.
+        -   `benchmark_results.json` / `benchmark_results_{model_name}.json`: Benchmark results from `benchmark_llms.py`.
+        -   `solutions_report.tex` / `solutions_report_{model_name}.tex`: Main LaTeX report for solutions generated by `export_benchmark_to_tex.py`.
+        -   `problems_{model_name}/`: Subdirectory containing split LaTeX files for individual problems.
+    -   `tex_outputs/`: Where compiled PDF outputs of LaTeX documents should be stored.
 
 ## Setup for Benchmarking
 
@@ -70,33 +114,3 @@ pdflatex -output-directory=output output/solutions_report.tex
     ANTHROPIC_API_KEY="your_anthropic_api_key"
     GOOGLE_API_KEY="your_google_api_key"
     ```
-
-### Now important: run the refinement agent
-
-Default: 
-```bash
-python refine_problems.py
-```
-Specifying how much input data file to use: 
-```bash
-python refine_problems.py --max-problems 10
-```
-
-Note that this will also create a json file with the critiques and updated problems at outputs/critiques. To do the benchmarking using the revised problems:
-```bash
-python benchmark_llms.py --input-file output/revised_problems.json --output-file output/revised_benchmark_results.json
-```
-
-Then, export the revised benchmark results to LaTeX
-```bash
-python export_benchmark_to_tex.py --benchmark-results-file output/revised_benchmark_results.json --output-tex-file output/revised_solutions_report.tex
-```
-
-Using the default commands from above will use all_papers_problems_filtered
-
-### Saving the critiques
-
-Use 
-```bash
-python export_critiques_to_tex.py
-```

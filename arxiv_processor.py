@@ -17,7 +17,7 @@ load_dotenv()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-num_papers = 10
+num_papers = 15
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
@@ -25,12 +25,12 @@ ARXIV_CATEGORIES = [
     "math-ph",      # Mathematical Physics
     "nlin.ao",
     # "cond-mat.soft",
-    # "cond-mat.dis-nn"
+    "cond-mat.dis-nn"
 
 ]
 
-DOWNLOAD_DIR = "output/arxiv_papers"
-OUTPUT_DIR = "output/raw_json_outputs"
+DOWNLOAD_DIR = "output/papers/arxiv_papers"
+OUTPUT_DIR = "output/papers/initial_QA_pairs"
 
 def setup_directories():
     """Creates the necessary directories if they don't exist."""
@@ -201,7 +201,7 @@ def generate_single_problem_gemini(tex_content: str, segment: str, problem_numbe
         full_prompt = f"{prompt}\\n\\nHere is the LaTeX content:\\n\\n{tex_content}"
 
         response = client.models.generate_content(
-            model="models/gemini-2.5-flash",
+            model="models/gemini-2.5-pro",
             contents=full_prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0 # Set deterministic temperature
