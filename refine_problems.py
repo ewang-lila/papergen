@@ -43,7 +43,7 @@ self_containment_critic = Agent(
     role="Problem Self-Containment Reviewer",
     goal="Review a physics problem to ensure it is self-contained.",
     backstory=(
-        "You are an expert physicist specializing in designing challenging problems for graduate students. "
+        "You are an expert physicist designing challenging problems for graduate students. "
         "The problems are created using research papers. Make sure that there are no references to the paper in the problem statement "
         "or to variables that are not self-defined (unless they would be obvious to a professional physicist)."
     ),
@@ -57,8 +57,8 @@ difficulty_critic = Agent(
     role="Problem Difficulty and Triviality Reviewer",
     goal="Assess if a physics problem is non-trivial and requires a genuine chain of reasoning.",
     backstory=(
-        "You are an expert in physics. "
-        "Using the provided source paper, you will judge if the problem is non-trivial and requires an advanced, multi-step chain of reasoning designed to challenge advanced physics PhD students."
+        "You are an expert physicist focusing on designing extremely challenging problems for PhD students in physics. "
+        "You will judge if the problem provided to you is sufficiently difficult for a PhD qualifying exam and requires an advanced, multi-step chain of reasoning designed to challenge the most advanced physics PhD students."
     ),
     llm=critic_llm,
     allow_delegation=False,
@@ -117,8 +117,9 @@ task_critique_difficulty = Task(
   description="""Review the physics problem below, which is designed to be as challenging as possible for a PhD student in physics.
   Your ONLY goal is to ensure the problem is non-trivial and requires a sophisticated chain of reasoning.
   It should NOT be a simple lookup of a fact, a direct restatement of an equation from the paper, or a simple application of a well-known technique or result.
-  Use the provided paper text to judge if the problem requires synthesizing multiple concepts or equations. 
-  *Note:* the problem is intended to be a sophisticated retracing of the paper's reasoning, for example, by going from equation 1 to equation 5 in the paper. The problem will be presented independently of the paper, so it is acceptable (and expected) for the paper to require rederivations of complex equations or terms in the paper.
+  The problem must synthesize multiple concepts or equations. 
+  *Note:* the problem is intended to be a sophisticated retracing of the paper's reasoning, for example, by going from equation 1 to equation 5 in the paper. 
+  The problem will be presented independently of the paper, so it is acceptable (and expected) for the paper to require rederivations of complex equations or terms in the paper.
 
   IMPORTANT: If the problem is trivial, you should mark it for removal.
 
@@ -128,8 +129,9 @@ task_critique_difficulty = Task(
   - "critique": string (a brief, one-sentence summary of your findings)
   
   
-  Example of correct output:
-  {"is_non_trivial": false, "critique": "The problem simply asks for a well-known formula that is directly stated in the paper."}
+  Examples of correct output:
+  {"is_non_trivial": false, "critique": "The problem simply asks to rederive an alternate form of an equation covered in most graduate quantum field theory courses."}
+  {"is_non_trivial": true, "critique": "This problem requires combining advanced concepts in statistical mechanics and field theory, as well as the application of Laplace transform to derive an analytical approximation."}
 
   Problem:
   ---
@@ -145,7 +147,7 @@ task_critique_difficulty = Task(
 # Task for the Refiner Agent
 task_refine_problem = Task(
   description="""Your task is to refine a physics problem based on specific feedback from two expert critics.
-  You must address every issue raised in the critiques you are provided, but only address the issues that are raised. If no issues are raised, you must leave the problem as is.
+  You must address every issue raised in the critiques you are provided, but only address the issues that are raised. If no issues are raised, leave the problem as is.
   Use the original problem and answer as a reference.
   
   CRITICAL: Your output MUST be a valid JSON object with EXACTLY these two keys:
@@ -155,7 +157,8 @@ task_refine_problem = Task(
   DO NOT include any text before or after the JSON object.
   DO NOT include any markdown, especially code blocks like```json.
   DO NOT include any other keys or metadata.
-  ONLY USE proper LaTeX formatting. Under no circumstances should you use any special characters or unicode characters in your response; use *only* LaTeX commands for ALL symbols and characters. If there are unicode characters in the original problem statement, you must replace them with LaTeX commands.
+  ONLY USE proper LaTeX formatting. Under no circumstances should you use any special characters or unicode characters in your response; use *only* LaTeX commands for ALL symbols and characters. 
+  If there are unicode characters in the original problem statement, you must replace them with LaTeX formatting.
 
   Example of correct output format:
   {
@@ -267,7 +270,7 @@ def process_paper(paper_data, args):
     paper_id = paper_data["paper_id"]
     print(f"\n\n--- Processing Paper: {paper_id} ---")
 
-    archive_glob_path = os.path.join("output/arxiv_papers", f"{paper_id}*.tar.gz")
+    archive_glob_path = os.path.join("output/papers/arxiv_papers", f"{paper_id}*.tar.gz")
     found_archives = glob.glob(archive_glob_path)
     if not found_archives:
         print(f"Warning: Could not find source archive for paper {paper_id}. Skipping.")
