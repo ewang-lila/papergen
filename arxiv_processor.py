@@ -11,13 +11,14 @@ import json
 import glob
 import re
 from prompt_template import LLM_PROMPT_TEMPLATE
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-num_papers = 15
+num_papers = 10
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
@@ -25,7 +26,7 @@ ARXIV_CATEGORIES = [
     "math-ph",      # Mathematical Physics
     "nlin.ao",
     # "cond-mat.soft",
-    "cond-mat.dis-nn"
+    # "cond-mat.dis-nn"
 
 ]
 
@@ -160,7 +161,7 @@ def parse_llm_output(output_text: str):
 
 def generate_single_problem(tex_content: str, segment: str, problem_number: int):
     """
-    Sends the LaTeX content to the OpenAI o3 model to generate a single problem.
+    Sends the LaTeX content to the OpenAI model to generate a single problem.
     """
     if not OPENAI_API_KEY:
         print("Error: OPENAI_API_KEY environment variable not set.")
@@ -170,7 +171,7 @@ def generate_single_problem(tex_content: str, segment: str, problem_number: int)
     client = OpenAI(api_key=OPENAI_API_KEY)
     try:
         response = client.chat.completions.create(
-            model="o3", # Assuming 'o3' is the correct model name
+            model="gpt-4.1", 
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": f"Here is the LaTeX content:\n\n{tex_content}"}
@@ -212,6 +213,50 @@ def generate_single_problem_gemini(tex_content: str, segment: str, problem_numbe
         print(f"An unexpected error occurred with Google Gemini API: {e}")
         return None
 
+def process_archive(archive: str, model: str):
+    print(f"Processing archive: {archive}")
+    combined_tex_content = extract_and_combine_tex_files(archive)
+
+    if not combined_tex_content:
+        print(f"Could not find/extract .tex content from {archive}")
+        return None
+
+    problems_data = []
+    segments = ["first half", "second half"]
+    for i, segment in enumerate(segments):
+        print(
+            f"Generating problem {i+1} for the {segment} of the paper using model: {model}..."
+        )
+        if model == "gemini":
+            raw_output = generate_single_problem_gemini(combined_tex_content, segment, i + 1)
+        else:
+            raw_output = generate_single_problem(combined_tex_content, segment, i + 1)
+
+        if raw_output:
+            parsed_problem = parse_llm_output(raw_output)
+            if parsed_problem:
+                problems_data.append(parsed_problem)
+            else:
+                print(f"Could not parse LLM output for the {segment} segment.")
+        else:
+            print(f"LLM did not return a response for the {segment} segment.")
+
+    if not problems_data:
+        print(f"Could not generate any problems for {archive}")
+        return None
+
+    base_name = os.path.basename(archive)
+    id_parts = base_name.split('.')
+    paper_id = f"{id_parts[0]}.{id_parts[1]}"
+
+    output_data = {"paper_id": paper_id, "problems": problems_data}
+    output_filename = os.path.join(OUTPUT_DIR, f"{paper_id}.json")
+    with open(output_filename, "w", encoding="utf-8") as f:
+        json.dump(output_data, f, indent=4, ensure_ascii=False)
+
+    print(f"All problems saved to {output_filename}")
+    return output_data
+
 def main():
     parser = argparse.ArgumentParser(description="Fetch arXiv papers, process them with an LLM, and save the results.")
     parser.add_argument(
@@ -228,9 +273,15 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="gemini",
-        choices=["o3", "gemini"],
-        help="The model to use for generation (o3 or gemini)."
+        default="gpt-4.1",
+        choices=["gpt-4.1", "gemini"],
+        help="The model to use for generation (gpt or gemini)."
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel workers to process papers",
     )
     args = parser.parse_args()
 
@@ -249,56 +300,19 @@ def main():
         print("Searching for and downloading new papers.")
         downloaded_archives = search_and_download_papers(max_results_per_category=num_papers)
 
-    for archive in downloaded_archives:
-        print(f"Processing archive: {archive}")
-        combined_tex_content = extract_and_combine_tex_files(archive)
-        
-        if combined_tex_content:
-            problems_data = []
-            segments = ["first half", "second half"]
-            for i, segment in enumerate(segments):
-                print(f"Generating problem {i+1} for the {segment} of the paper using model: {args.model}...")
-                
-                raw_output = None
-                if args.model == "gemini":
-                    raw_output = generate_single_problem_gemini(combined_tex_content, segment, i+1)
-                else: # Default to o3
-                    raw_output = generate_single_problem(combined_tex_content, segment, i+1)
+    results = []
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        future_to_archive = {executor.submit(process_archive, archive, args.model): archive for archive in downloaded_archives}
+        for future in as_completed(future_to_archive):
+            result = future.result()
+            if result:
+                results.append(result)
 
-                if raw_output:
-                    parsed_problem = parse_llm_output(raw_output)
-                    if parsed_problem:
-                         # Add problem number to the statement
-                        parsed_problem['problem_statement'] = parsed_problem['problem_statement']
-                        problems_data.append(parsed_problem)
-                    else:
-                        print(f"Could not parse LLM output for the {segment} segment.")
-                else:
-                    print(f"LLM did not return a response for the {segment} segment.")
-            
-            if problems_data:
-                # Combine the individually generated problems into one string
-                # Extract paper ID from the filename for saving
-                base_name = os.path.basename(archive)
-                # The filename is expected to be like '2506.17126v1.title.tar.gz'
-                # We want to get '2506.17126v1'
-                id_parts = base_name.split('.')
-                paper_id = f"{id_parts[0]}.{id_parts[1]}"
-                
-                output_data = {
-                    "paper_id": paper_id,
-                    "problems": problems_data
-                }
-                output_filename = os.path.join(OUTPUT_DIR, f"{paper_id}.json")
-                
-                with open(output_filename, 'w', encoding='utf-8') as f:
-                    json.dump(output_data, f, indent=4, ensure_ascii=False)
-                
-                print(f"All problems saved to {output_filename}")
-            else:
-                print(f"Could not generate any problems for {archive}")
-        else:
-            print(f"Could not find/extract .tex content from {archive}")
+    if results:
+        aggregated_filename = os.path.join(OUTPUT_DIR, "all_papers.json")
+        with open(aggregated_filename, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=4, ensure_ascii=False)
+        print(f"Aggregated results saved to {aggregated_filename}")
 
 if __name__ == "__main__":
     main() 

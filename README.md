@@ -15,10 +15,11 @@ python arxiv_processor.py
 - `--no-download`: Use this flag to skip downloading and process papers already present in `output/papers/arxiv_papers/`.
 - `--limit <N>`: When used with `--no-download`, this will only process the first `N` papers found locally.
 - `--model <model_name>`: Choose the model for problem generation (e.g., `gemini` or `o3`).
+- `--workers <N>`: Process papers in parallel using `N` worker threads.
 
-Example: Process the first 5 local papers using the `gemini` model.
+Example: Process the first 5 local papers using the `gemini` model with 5 workers.
 ```bash
-python arxiv_processor.py --no-download --model gemini --limit 5
+python arxiv_processor.py --no-download --model gemini --limit 5 --workers 5
 ```
 
 ### Step 2: Consolidate and Filter Raw Outputs
