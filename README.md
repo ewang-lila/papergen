@@ -42,6 +42,11 @@ Specifying how much input data file to use:
 python refine_problems.py --max-problems 10
 ```
 
+Running in parallel with multiple workers:
+```bash
+python refine_problems.py --workers 5
+```
+
 This will create a JSON file with the critiques at `output/critiques/all_critiques.json` and updated problems at `output/problems/revised_problems.json`.
 
 ### Step 4: Benchmark LLMs
