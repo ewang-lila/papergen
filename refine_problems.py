@@ -5,6 +5,8 @@ import re
 import argparse
 import tarfile
 import glob
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from crewai import Crew, Agent, Task, LLM
 from dotenv import load_dotenv
 
@@ -27,8 +29,12 @@ refiner_llm = LLM(
 critic_llm = LLM(
     model="openai/gpt-4.1-mini",
     temperature=0.0,
-    api_key=openai_api_key, 
+    api_key=openai_api_key,
 )
+
+# Global counters for parallel processing
+processed_lock = threading.Lock()
+processed_count = 0
 
 # --- Agents ---
 
@@ -254,12 +260,183 @@ def parse_json_output(output_str):
         print(f"Error parsing JSON output: {e}")
         return None
 
+
+def process_paper(paper_data, args):
+    global processed_count
+
+    paper_id = paper_data["paper_id"]
+    print(f"\n\n--- Processing Paper: {paper_id} ---")
+
+    archive_glob_path = os.path.join("output/arxiv_papers", f"{paper_id}*.tar.gz")
+    found_archives = glob.glob(archive_glob_path)
+    if not found_archives:
+        print(f"Warning: Could not find source archive for paper {paper_id}. Skipping.")
+        return None
+
+    archive_path = found_archives[0]
+    paper_text = extract_and_combine_tex_files(archive_path)
+    if not paper_text:
+        print(f"Warning: Could not extract text from archive for paper {paper_id}. Skipping.")
+        return None
+
+    refined_problems_for_paper = []
+    local_critiques = []
+    local_processed = 0
+    local_removed = 0
+
+    for i, problem in enumerate(paper_data.get("problems", [])):
+        with processed_lock:
+            if args.max_problems and processed_count >= args.max_problems:
+                break
+            processed_count += 1
+            local_processed += 1
+
+        inputs = {
+            "problem_statement": problem["problem_statement"],
+            "final_solution": problem["final_solution"],
+            "paper_text": paper_text,
+        }
+
+        critiques = {}
+        debug_outputs = {}
+
+        try:
+            sc_crew = Crew(agents=[self_containment_critic], tasks=[task_critique_self_containment], verbose=False)
+            sc_result = sc_crew.kickoff(inputs=inputs)
+            sc_str = str(sc_result.raw) if hasattr(sc_result, "raw") else str(sc_result)
+            debug_outputs["self_containment_raw"] = sc_str
+            sc_parsed = parse_json_output(sc_str)
+            if sc_parsed:
+                critiques["self_containment"] = sc_parsed
+            else:
+                raise ValueError("Failed to parse JSON output")
+        except Exception as e:
+            print(f"Error in self-containment critique: {e}")
+            critiques["self_containment"] = {"error": str(e)}
+
+        try:
+            diff_crew = Crew(agents=[difficulty_critic], tasks=[task_critique_difficulty], verbose=False)
+            diff_result = diff_crew.kickoff(inputs=inputs)
+            diff_str = str(diff_result.raw) if hasattr(diff_result, "raw") else str(diff_result)
+            debug_outputs["difficulty_raw"] = diff_str
+            diff_parsed = parse_json_output(diff_str)
+            if diff_parsed:
+                critiques["difficulty"] = diff_parsed
+            else:
+                raise ValueError("Failed to parse JSON output")
+        except Exception as e:
+            print(f"Error in difficulty critique: {e}")
+            critiques["difficulty"] = {"error": str(e)}
+
+        is_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", True)
+        if not is_non_trivial:
+            critique_text = critiques.get("difficulty", {}).get("critique", "No critique provided.")
+            print(f"Problem marked for removal: problem is trivial. Critique: {critique_text}")
+            local_removed += 1
+            critique_entry = {
+                "paper_id": paper_id,
+                "problem_index": i,
+                "original_problem": {
+                    "problem_statement": problem["problem_statement"],
+                    "final_solution": problem["final_solution"],
+                },
+                "critiques": critiques,
+                "removed": True,
+                "removal_reason": f"Trivial problem: {critique_text}",
+            }
+            local_critiques.append(critique_entry)
+            continue
+
+        try:
+            refiner_crew = Crew(
+                agents=[self_containment_critic, difficulty_critic, problem_refiner],
+                tasks=[task_critique_self_containment, task_critique_difficulty, task_refine_problem],
+                verbose=True,
+            )
+            refiner_result = refiner_crew.kickoff(inputs=inputs)
+            refiner_raw = str(refiner_result.raw) if hasattr(refiner_result, "raw") else str(refiner_result)
+            debug_outputs["refiner_raw"] = refiner_raw
+            refined_parsed = parse_json_output(refiner_raw)
+            if refined_parsed and "problem_statement" in refined_parsed and "final_solution" in refined_parsed:
+                clean_refined = {
+                    "problem_statement": str(refined_parsed["problem_statement"]),
+                    "final_solution": str(refined_parsed["final_solution"]),
+                }
+                refined_problems_for_paper.append(clean_refined)
+                critique_entry = {
+                    "paper_id": paper_id,
+                    "problem_index": i,
+                    "original_problem": {
+                        "problem_statement": problem["problem_statement"],
+                        "final_solution": problem["final_solution"],
+                    },
+                    "critiques": critiques,
+                    "refined_problem": clean_refined,
+                    "included_in_dataset": True,
+                }
+                local_critiques.append(critique_entry)
+            else:
+                raise ValueError("Failed to parse JSON output or missing required fields")
+        except Exception as e:
+            print(f"Warning: Failed to refine problem: {e}")
+            was_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", False)
+            if was_non_trivial:
+                print("Including original non-trivial problem despite refinement error")
+                clean_original = {
+                    "problem_statement": problem["problem_statement"],
+                    "final_solution": problem["final_solution"],
+                }
+                refined_problems_for_paper.append(clean_original)
+                included = True
+            else:
+                print("Excluding trivial problem that failed refinement")
+                local_removed += 1
+                included = False
+            critique_entry = {
+                "paper_id": paper_id,
+                "problem_index": i,
+                "original_problem": {
+                    "problem_statement": problem["problem_statement"],
+                    "final_solution": problem["final_solution"],
+                },
+                "critiques": critiques,
+                "refinement_error": str(e),
+                "included_in_dataset": included,
+            }
+            local_critiques.append(critique_entry)
+
+        debug_filename = f"output/critiques/debug/{paper_id}_problem_{i}_debug.json"
+        with open(debug_filename, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "paper_id": paper_id,
+                    "problem_index": i,
+                    "problem_statement": problem["problem_statement"],
+                    "final_solution": problem["final_solution"],
+                    "debug_outputs": debug_outputs,
+                    "critiques_parsed": critiques,
+                },
+                f,
+                indent=2,
+                ensure_ascii=False,
+            )
+
+    if refined_problems_for_paper:
+        return {
+            "paper_id": paper_id,
+            "problems": refined_problems_for_paper,
+            "critiques": local_critiques,
+            "processed": local_processed,
+            "removed": local_removed,
+        }
+    return None
+
 # --- Main Execution ---
 
 def main():
     os.makedirs("output/critiques", exist_ok=True)
     os.makedirs("output/critiques/debug", exist_ok=True)
-    
+
     parser = argparse.ArgumentParser(description="Refine problems from a consolidated JSON file.")
     parser.add_argument(
         "--input-file",
@@ -272,6 +449,12 @@ def main():
         type=int,
         default=None,
         help="Maximum number of problems to process (for testing). If not specified, all problems will be processed."
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of worker threads to use for parallel processing."
     )
     args = parser.parse_args()
 
@@ -290,220 +473,28 @@ def main():
     total_problems_processed = 0
     total_problems_removed = 0
 
-    for paper_data in all_papers_data:
-        # Check if we've reached the limit
-        if args.max_problems and total_problems_processed >= args.max_problems:
-            print(f"\nReached maximum number of problems to process ({args.max_problems}). Stopping.")
-            break
-            
-        paper_id = paper_data["paper_id"]
-        print(f"\n\n--- Processing Paper: {paper_id} ---")
-
-        # Find the paper's source archive
-        archive_glob_path = os.path.join("output/arxiv_papers", f"{paper_id}*.tar.gz")
-        found_archives = glob.glob(archive_glob_path)
-        
-        if not found_archives:
-            print(f"Warning: Could not find source archive for paper {paper_id}. Skipping.")
-            continue
-        
-        archive_path = found_archives[0]
-        paper_text = extract_and_combine_tex_files(archive_path)
-
-        if not paper_text:
-            print(f"Warning: Could not extract text from archive for paper {paper_id}. Skipping.")
-            continue
-
-        refined_problems_for_paper = []
-        for i, problem in enumerate(paper_data.get("problems", [])):
-            # Check if we've reached the limit
-            if args.max_problems and total_problems_processed >= args.max_problems:
-                print(f"\nReached maximum number of problems to process ({args.max_problems}). Stopping.")
-                break
-                
-            print(f"\n--- Refining Problem {i+1}/{len(paper_data['problems'])} for paper {paper_id} ---")
-            print(f"Total problems processed so far: {total_problems_processed}")
-
-            inputs = {
-                "problem_statement": problem["problem_statement"],
-                "final_solution": problem["final_solution"],
-                "paper_text": paper_text
-            }
-
-            # Execute critic tasks individually
-            critiques = {}
-            debug_outputs = {}
-            
-            # Self-containment critique
-            try:
-                sc_crew = Crew(
-                    agents=[self_containment_critic],
-                    tasks=[task_critique_self_containment],
-                    verbose=False
-                )
-                sc_result = sc_crew.kickoff(inputs=inputs)
-                sc_str = str(sc_result.raw) if hasattr(sc_result, 'raw') else str(sc_result)
-                
-                debug_outputs["self_containment_raw"] = sc_str
-                
-                # Parse JSON output
-                sc_parsed = parse_json_output(sc_str)
-                if sc_parsed:
-                    critiques["self_containment"] = sc_parsed
-                else:
-                    raise ValueError("Failed to parse JSON output")
-                
-            except Exception as e:
-                print(f"Error in self-containment critique: {e}")
-                critiques["self_containment"] = {"error": str(e)}
-            
-            # Difficulty critique
-            try:
-                diff_crew = Crew(
-                    agents=[difficulty_critic],
-                    tasks=[task_critique_difficulty],
-                    verbose=False
-                )
-                diff_result = diff_crew.kickoff(inputs=inputs)
-                diff_str = str(diff_result.raw) if hasattr(diff_result, 'raw') else str(diff_result)
-                
-                debug_outputs["difficulty_raw"] = diff_str
-                
-                # Parse JSON output
-                diff_parsed = parse_json_output(diff_str)
-                if diff_parsed:
-                    critiques["difficulty"] = diff_parsed
-                else:
-                    raise ValueError("Failed to parse JSON output")
-                
-            except Exception as e:
-                print(f"Error in difficulty critique: {e}")
-                critiques["difficulty"] = {"error": str(e)}
-            
-            # Check if the problem is trivial and should be removed
-            is_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", True)  # Default to non-trivial (don't remove)
-
-            if not is_non_trivial:
-                critique_text = critiques.get("difficulty", {}).get("critique", "No critique provided.")
-                print(f"Problem marked for removal: problem is trivial. Critique: {critique_text}")
-                total_problems_removed += 1
-
-                critique_entry = {
-                    "paper_id": paper_id,
-                    "problem_index": i,
-                    "original_problem": {
-                        "problem_statement": problem["problem_statement"],
-                        "final_solution": problem["final_solution"]
-                    },
-                    "critiques": critiques,
-                    "removed": True,
-                    "removal_reason": f"Trivial problem: {critique_text}"
-                }
-                all_critiques.append(critique_entry)
-                total_problems_processed += 1
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        futures = [executor.submit(process_paper, paper, args) for paper in all_papers_data]
+        for future in as_completed(futures):
+            result = future.result()
+            if not result:
                 continue
+            all_refined_papers.append({"paper_id": result["paper_id"], "problems": result["problems"]})
+            all_critiques.extend(result["critiques"])
+            total_problems_processed += result["processed"]
+            total_problems_removed += result["removed"]
 
-            # Now run the refiner
-            try:
-                refiner_crew = Crew(
-                    agents=[self_containment_critic, difficulty_critic, problem_refiner],
-                    tasks=[task_critique_self_containment, task_critique_difficulty, task_refine_problem],
-                    verbose=True
-                )
-                refiner_result = refiner_crew.kickoff(inputs=inputs)
-                
-                # Get the raw output
-                refiner_raw = str(refiner_result.raw) if hasattr(refiner_result, 'raw') else str(refiner_result)
-                debug_outputs["refiner_raw"] = refiner_raw
-                
-                # Parse JSON output
-                refined_parsed = parse_json_output(refiner_raw)
-                if refined_parsed and "problem_statement" in refined_parsed and "final_solution" in refined_parsed:
-                    clean_refined_problem = {
-                        "problem_statement": str(refined_parsed["problem_statement"]),
-                        "final_solution": str(refined_parsed["final_solution"])
-                    }
-                    refined_problems_for_paper.append(clean_refined_problem)
-                    
-                    critique_entry = {
-                        "paper_id": paper_id,
-                        "problem_index": i,
-                        "original_problem": {
-                            "problem_statement": problem["problem_statement"],
-                            "final_solution": problem["final_solution"]
-                        },
-                        "critiques": critiques,
-                        "refined_problem": clean_refined_problem,
-                        "included_in_dataset": True
-                    }
-                    all_critiques.append(critique_entry)
-                else:
-                    raise ValueError("Failed to parse JSON output or missing required fields")
-                    
-            except Exception as e:
-                print(f"Warning: Failed to refine problem: {e}")
-                
-                # Include original if it was non-trivial
-                was_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", False)
-                if was_non_trivial:
-                    print(f"Including original non-trivial problem despite refinement error")
-                    clean_original = {
-                        "problem_statement": problem["problem_statement"],
-                        "final_solution": problem["final_solution"]
-                    }
-                    refined_problems_for_paper.append(clean_original)
-                    included = True
-                else:
-                    print(f"Excluding trivial problem that failed refinement")
-                    total_problems_removed += 1
-                    included = False
-                
-                critique_entry = {
-                    "paper_id": paper_id,
-                    "problem_index": i,
-                    "original_problem": {
-                        "problem_statement": problem["problem_statement"],
-                        "final_solution": problem["final_solution"]
-                    },
-                    "critiques": critiques,
-                    "refinement_error": str(e),
-                    "included_in_dataset": included
-                }
-                all_critiques.append(critique_entry)
-            
-            # Save debug outputs
-            debug_filename = f"output/critiques/debug/{paper_id}_problem_{i}_debug.json"
-            with open(debug_filename, 'w', encoding='utf-8') as f:
-                json.dump({
-                    "paper_id": paper_id,
-                    "problem_index": i,
-                    "problem_statement": problem["problem_statement"],
-                    "final_solution": problem["final_solution"],
-                    "debug_outputs": debug_outputs,
-                    "critiques_parsed": critiques
-                }, f, indent=2, ensure_ascii=False)
-            
-            total_problems_processed += 1
-        
-        if refined_problems_for_paper:
-            all_refined_papers.append({
-                "paper_id": paper_id,
-                "problems": refined_problems_for_paper
-            })
-
-    # Save all refined problems to a single file
     output_filename = "output/problems/revised_problems.json"
     with open(output_filename, 'w', encoding='utf-8') as f:
         json.dump(all_refined_papers, f, indent=4, ensure_ascii=False)
 
-    # Save all critiques to a file
     critiques_filename = "output/critiques/all_critiques.json"
     with open(critiques_filename, 'w', encoding='utf-8') as f:
         json.dump(all_critiques, f, indent=4, ensure_ascii=False)
 
     print(f"\nAll papers processed. Refined problems saved to {output_filename}")
     print(f"Critiques saved to {critiques_filename}")
-    print(f"\nStatistics:")
+    print("\nStatistics:")
     print(f"  Total problems processed: {total_problems_processed}")
     print(f"  Problems removed (too trivial): {total_problems_removed}")
     print(f"  Problems in final dataset: {total_problems_processed - total_problems_removed}")
