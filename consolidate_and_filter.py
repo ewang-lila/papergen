@@ -10,28 +10,28 @@ def consolidate_and_filter():
     """
     Consolidates raw JSON outputs and filters them based on quality rules.
     """
-    # Part 1: Consolidate raw JSON files
-    json_files = glob.glob(os.path.join(RAW_OUTPUT_DIR, "*.json"))
-    if not json_files:
-        print(f"No JSON files found in '{RAW_OUTPUT_DIR}' to process.")
+    # Part 1: Load data from the consolidated all_papers.json
+    consolidated_file_path = os.path.join(RAW_OUTPUT_DIR, "all_papers.json")
+    
+    if not os.path.exists(consolidated_file_path):
+        print(f"Error: Consolidated file '{consolidated_file_path}' not found.")
         return
 
-    all_papers_data = []
-    for file_path in sorted(json_files):
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            all_papers_data.append(data)
-        except json.JSONDecodeError as e:
-            print(f"Warning: Skipping file due to JSON error: {file_path} - {e}")
-        except Exception as e:
-            print(f"Warning: Skipping file due to unexpected error: {file_path} - {e}")
+    try:
+        with open(consolidated_file_path, 'r', encoding='utf-8') as f:
+            all_papers_data = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON from {consolidated_file_path}: {e}")
+        return
+    except Exception as e:
+        print(f"Unexpected error reading {consolidated_file_path}: {e}")
+        return
 
     if not all_papers_data:
-        print("No valid paper data was consolidated. Halting.")
+        print("No paper data found in the consolidated file. Halting.")
         return
         
-    print(f"Consolidated {len(all_papers_data)} papers from raw outputs.")
+    print(f"Loaded {len(all_papers_data)} papers from '{consolidated_file_path}'.")
 
     # Part 2: Filter the consolidated problems
     filtered_papers_data = []
@@ -88,6 +88,9 @@ def consolidate_and_filter():
         if filtered_problems_for_paper:
             paper_data["problems"] = filtered_problems_for_paper
             filtered_papers_data.append(paper_data)
+
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(FILTERED_OUTPUT_FILENAME), exist_ok=True)
 
     with open(FILTERED_OUTPUT_FILENAME, 'w', encoding='utf-8') as f:
         json.dump(filtered_papers_data, f, indent=4, ensure_ascii=False)

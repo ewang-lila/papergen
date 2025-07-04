@@ -18,7 +18,7 @@ load_dotenv()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-num_papers = 15
+num_papers = 10
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
@@ -26,7 +26,7 @@ ARXIV_CATEGORIES = [
     "math-ph",      # Mathematical Physics
     "nlin.ao",
     # "cond-mat.soft",
-    "cond-mat.dis-nn"
+    # "cond-mat.dis-nn"
 
 ]
 
@@ -161,7 +161,7 @@ def parse_llm_output(output_text: str):
 
 def generate_single_problem(tex_content: str, segment: str, problem_number: int):
     """
-    Sends the LaTeX content to the OpenAI o3 model to generate a single problem.
+    Sends the LaTeX content to the OpenAI model to generate a single problem.
     """
     if not OPENAI_API_KEY:
         print("Error: OPENAI_API_KEY environment variable not set.")
@@ -171,7 +171,7 @@ def generate_single_problem(tex_content: str, segment: str, problem_number: int)
     client = OpenAI(api_key=OPENAI_API_KEY)
     try:
         response = client.chat.completions.create(
-            model="o3", # Assuming 'o3' is the correct model name
+            model="gpt-4.1", 
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": f"Here is the LaTeX content:\n\n{tex_content}"}
@@ -273,9 +273,9 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="gemini",
-        choices=["o3", "gemini"],
-        help="The model to use for generation (o3 or gemini)."
+        default="gpt-4.1",
+        choices=["gpt-4.1", "gemini"],
+        help="The model to use for generation (gpt or gemini)."
     )
     parser.add_argument(
         "--workers",
