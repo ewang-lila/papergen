@@ -51,8 +51,8 @@ difficulty_critic = Agent(
     role="Problem Difficulty and Triviality Reviewer",
     goal="Assess if a physics problem is non-trivial and requires a genuine chain of reasoning.",
     backstory=(
-        "You are an expert in physics. "
-        "Using the provided source paper, you will judge if the problem is non-trivial and requires an advanced, multi-step chain of reasoning designed to challenge advanced physics PhD students."
+        "You are an expert physicist designing extremely challenging problems for PhD qualifying exams. "
+        "Determine whether the problem is sufficiently difficult and requires an advanced, multi-step chain of reasoning designed to challenge the most advanced physics PhD students."
     ),
     llm=critic_llm,
     allow_delegation=False,
@@ -92,15 +92,21 @@ task_critique_self_containment = Task(
     The JSON object MUST have exactly these keys:
     - "is_self_contained": boolean
     - "critique": string (a brief, one-sentence summary of your findings, empty string if is_self_contained is true)
-    - "suggestion": string (one concrete way to fix the issue, empty string if is_self_contained is true)
+    - "suggestion": string (one concrete fix for the issue, empty string if is_self_contained is true)
 
   If the problem is satisfactory, "is_self_contained" should be true and "critique" should be an empty list. Only provide suggestions if the problem is not self-contained; do not nitpick on minor details or make the problem easier if it is already self-contained.
+
+  Example of correct output:
+  {"is_self_contained": false, "critique": "The term $v_{\mu}$ is used in the final solution but not defined in the problem statement, despite being defined as the frictional velocity in the main text.", "suggestion": "Add the phrase, 'where $v_{\mu} is the frictional velocity' at the end of the problem statement."}
 
   Problem:
   ---
   Problem Statement: {problem_statement}
-  Final Solution: {final_solution}
+  Solution: {final_solution}
   ---
+
+  Paper text for reference:
+  {paper_text}
   """,
   expected_output="A valid JSON object containing the fields 'is_self_contained', 'critique', and 'suggestion'.",
   agent=self_containment_critic
@@ -109,22 +115,23 @@ task_critique_self_containment = Task(
 # Task for the Difficulty Critic
 task_critique_difficulty = Task(
   description="""Review the physics problem below, which is designed to be as challenging as possible for a PhD student in physics.
-  Your ONLY goal is to ensure the problem is non-trivial and requires a sophisticated chain of reasoning.
-  It should NOT be a simple lookup of a fact, a direct restatement of an equation from the paper, or a simple application of a well-known technique or result.
-  Use the provided paper text to judge if the problem requires synthesizing multiple concepts or equations. 
-  *Note:* the problem is intended to be a sophisticated retracing of the paper's reasoning, for example, by going from equation 1 to equation 5 in the paper. The problem will be presented independently of the paper, so it is acceptable (and expected) for the paper to require rederivations of complex equations or terms in the paper.
-
-  IMPORTANT: If the problem is trivial, you should mark it for removal.
+  Your ONLY goal is to ensure the problem is sufficiently difficult, requiring a sophisticated chain of reasoning.
+  It should NOT be a simple lookup of a fact, a direct restatement of an equation or model most physics PhD students would know, or a straightforward application of a well-known technique or result.
+  The problem should require synthesizing multiple concepts or equations. 
+  *Note:* the problem is intended to be a sophisticated retracing of the paper's reasoning, for example, by going from equation 1 to equation 5 in the paper. 
+  The problem will be presented independently of the paper, so it is acceptable (and expected) for the question to require rederivations of complex equations or terms shown in the paper.
 
   CRITICAL: Your response MUST be ONLY a valid JSON object with NO other text before or after it.
   The JSON object MUST have exactly these keys:
   - "is_non_trivial": boolean
   - "critique": string (a brief, one-sentence summary of your findings)
   
+  IMPORTANT: If the problem is not sufficiently difficult, "is_non_trivial" must be false.
   
   Example of correct output:
-  {"is_non_trivial": false, "critique": "The problem simply asks for a well-known formula that is directly stated in the paper."}
-
+  {"is_non_trivial": false, "critique": "The problem asks for an alternate form of a equation covered in most graduate quantum field theory courses."}
+  {"is_non_trivial": true, "critique": "The question requires detailed knowledge of statistical mechanics and field theory, as well as the application of the Laplace transform to derive an approximate analytical solution."}
+  
   Problem:
   ---
   Problem Statement: {problem_statement}
