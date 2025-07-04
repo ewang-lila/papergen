@@ -269,7 +269,7 @@ def process_paper(paper_data):
         task_refine_problem,
     ) = create_agents_and_tasks()
     paper_id = paper_data["paper_id"]
-    archive_glob_path = os.path.join("output/arxiv_papers", f"{paper_id}*.tar.gz")
+    archive_glob_path = os.path.join("output/papers/arxiv_papers", f"{paper_id}*.tar.gz")
     found_archives = glob.glob(archive_glob_path)
 
     if not found_archives:
