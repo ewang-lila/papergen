@@ -2,6 +2,10 @@ import json
 import glob
 import os
 import re
+import numpy as np
+from openai import OpenAI
+from sklearn.metrics.pairwise import cosine_similarity
+from dotenv import load_dotenv
 
 RAW_OUTPUT_DIR = "output/papers/initial_QA_pairs"
 FILTERED_OUTPUT_FILENAME = "output/problems/all_papers_problems_filtered.json"
@@ -10,6 +14,13 @@ def consolidate_and_filter():
     """
     Consolidates raw JSON outputs and filters them based on quality rules.
     """
+    def extract_task(statement):
+        """Extracts the 'Task' section from a problem statement."""
+        match = re.search(r'Task:(.*)', statement, re.DOTALL | re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        return ""
+
     # Part 1: Load data from the consolidated all_papers.json
     consolidated_file_path = os.path.join(RAW_OUTPUT_DIR, "all_papers.json")
     
@@ -43,6 +54,7 @@ def consolidate_and_filter():
         "solution_in_problem_statement": 0,
         "extraneous_latex_in_problem_statement": 0,
         "solution_contains_prose": 0,
+        "duplicate_problem": 0,
     }
 
     for paper_data in all_papers_data:
@@ -88,6 +100,94 @@ def consolidate_and_filter():
         if filtered_problems_for_paper:
             paper_data["problems"] = filtered_problems_for_paper
             filtered_papers_data.append(paper_data)
+
+    # Part 3: Deduplicate problems using embeddings
+    print("\n--- Deduplication Step ---")
+
+    load_dotenv()
+    if not os.getenv("OPENAI_API_KEY"):
+        print("Warning: OPENAI_API_KEY environment variable not found in a .env file.")
+        print("Create a .env file with OPENAI_API_KEY='your-key' to enable deduplication.")
+        print("Skipping deduplication step.")
+    else:
+        try:
+            client = OpenAI()
+
+            all_problems = []
+            for paper in filtered_papers_data:
+                all_problems.extend(paper.get("problems", []))
+
+            if len(all_problems) < 2:
+                print("Not enough problems to run deduplication.")
+            else:
+                print(f"Running deduplication on {len(all_problems)} problems.")
+                
+                problem_texts = [
+                    extract_task(p.get("problem_statement", "")) + "\n\n" + p.get("final_solution", "")
+                    for p in all_problems
+                ]
+
+                response = client.embeddings.create(
+                    input=problem_texts,
+                    model="text-embedding-3-small"
+                )
+                embeddings = np.array([item.embedding for item in response.data])
+                
+                similarity_matrix = cosine_similarity(embeddings)
+                
+                duplicate_indices = set()
+                similarity_threshold = 0.75
+                print(f"Using similarity threshold: {similarity_threshold}")
+                num_duplicates_found = 0
+                for i in range(len(similarity_matrix)):
+                    if i in duplicate_indices:
+                        continue
+                    for j in range(i + 1, len(similarity_matrix)):
+                        if j in duplicate_indices:
+                            continue
+                        if similarity_matrix[i][j] > similarity_threshold:
+                            duplicate_indices.add(j)
+                            num_duplicates_found += 1
+                            
+                            problem_i_task = extract_task(all_problems[i].get("problem_statement", ""))
+                            problem_j_task = extract_task(all_problems[j].get("problem_statement", ""))
+                            
+                            print(f"\n--- Found Duplicate Pair {num_duplicates_found} (Similarity: {similarity_matrix[i][j]:.4f}) ---")
+                            print(f"  Keeping problem (index {i}):")
+                            print(f"    Task: {problem_i_task[:150].replace(chr(10), ' ')}...")
+                            print(f"    Solution: {all_problems[i].get('final_solution','')[:150].replace(chr(10), ' ')}...")
+                            print(f"  Removing problem (index {j}):")
+                            print(f"    Task: {problem_j_task[:150].replace(chr(10), ' ')}...")
+                            print(f"    Solution: {all_problems[j].get('final_solution','')[:150].replace(chr(10), ' ')}...")
+                            print("----------------------------------------------------------------------")
+
+
+                num_duplicates = len(duplicate_indices)
+                if num_duplicates > 0:
+                    print(f"\nFound and removed {num_duplicates} duplicate problems in total.")
+                    total_problems_filtered += num_duplicates
+                    filter_reasons["duplicate_problem"] = num_duplicates
+                    
+                    problems_to_remove_ids = {id(all_problems[i]) for i in duplicate_indices}
+                    
+                    deduplicated_papers = []
+                    for paper_data in filtered_papers_data:
+                        original_problems = paper_data.get("problems", [])
+                        deduplicated_problems_for_paper = [
+                            p for p in original_problems if id(p) not in problems_to_remove_ids
+                        ]
+                        
+                        if deduplicated_problems_for_paper:
+                            paper_data["problems"] = deduplicated_problems_for_paper
+                            deduplicated_papers.append(paper_data)
+                    
+                    filtered_papers_data = deduplicated_papers
+                else:
+                    print("No duplicates found.")
+
+        except Exception as e:
+            print(f"An error occurred during deduplication: {e}")
+            print("Skipping deduplication step.")
 
     # Ensure output directory exists
     os.makedirs(os.path.dirname(FILTERED_OUTPUT_FILENAME), exist_ok=True)

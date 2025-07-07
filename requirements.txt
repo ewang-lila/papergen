@@ -11,3 +11,6 @@ tqdm
 google-cloud-aiplatform
 crewai
 crewai[tools]
+numpy
+scikit-learn
+ipykernel
