@@ -507,7 +507,7 @@ def main():
         all_refined_papers = truncated
 
     # Save all refined problems to a single file
-    output_filename = "output/problems/revised_problems.json"
+    output_filename = "output/problems/refined_problems.json"
     with open(output_filename, 'w', encoding='utf-8') as f:
         json.dump(all_refined_papers, f, indent=4, ensure_ascii=False)
 

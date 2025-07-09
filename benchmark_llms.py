@@ -22,6 +22,7 @@ SUPPORTED_MODELS = [
     "o4-mini",
     "claude-4",
     "gemini-2.5-pro",
+    "gemini-2.5-flash-lite-preview-06-17",
 ]
 
 JUDGE_MODEL = "gpt-4.1-mini"
@@ -204,7 +205,7 @@ def main():
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/problems/revised_problems.json",
+        default="output/problems/refined_problems.json",
         help="Path to the JSON file with problems to benchmark."
     )
     parser.add_argument(
