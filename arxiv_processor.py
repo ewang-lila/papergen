@@ -12,13 +12,15 @@ import glob
 import re
 from prompt_template import LLM_PROMPT_TEMPLATE
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+import requests
 
 load_dotenv()
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-num_papers = 10
+num_papers = 20
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
@@ -39,6 +41,19 @@ def setup_directories():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     print(f"Ensured directories '{DOWNLOAD_DIR}' and '{OUTPUT_DIR}' exist.")
 
+def download_file_with_requests(url: str, path: str):
+    """Downloads a file using requests and saves it to a path."""
+    try:
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(path, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        return path
+    except Exception as e:
+        print(f"Error downloading {url} with requests: {e}")
+        return None
+
 def search_and_download_papers(max_results_per_category=5):
     """
     Searches for papers in specified arXiv categories and downloads their source.
@@ -58,12 +73,27 @@ def search_and_download_papers(max_results_per_category=5):
         for result in client.results(search):
             print(f"Found paper: {result.title} ({result.entry_id})")
             try:
-                # Download the source (.tar.gz) file
-                filename = result.download_source(dirpath=DOWNLOAD_DIR)
-                downloaded_files.append(filename)
-                print(f"Downloaded source to: {filename}")
+                # time.sleep(3)
+                # The default .download_source() uses urllib which hangs.
+                # We will use the requests library instead.
+                if not result.pdf_url:
+                    print(f"No PDF URL for {result.entry_id}, skipping download.")
+                    continue
+                
+                src_url = result.pdf_url.replace('/pdf/', '/src/')
+                # Use the library's own filename generator
+                filename = result._get_default_filename("tar.gz")
+                filepath = os.path.join(DOWNLOAD_DIR, filename)
+
+                # Use our new function to download the file
+                downloaded_path = download_file_with_requests(src_url, filepath)
+
+                if downloaded_path:
+                    downloaded_files.append(downloaded_path)
+                    print(f"Downloaded source to: {downloaded_path}")
+
             except Exception as e:
-                print(f"Error downloading source for {result.entry_id}: {e}")
+                print(f"Error during download for {result.entry_id}: {e}")
     return downloaded_files
 
 def extract_and_combine_tex_files(archive_path):

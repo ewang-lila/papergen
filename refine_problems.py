@@ -54,6 +54,21 @@ def create_agents_and_tasks():
         verbose=True,
     )
 
+    judge_llm = LLM(
+        model="openai/gpt-4.1-mini",
+        temperature=0.0,
+        api_key=openai_api_key,
+    )
+
+    critique_judge = Agent(
+        role="Critique Ranking Judge",
+        goal="Choose the best critique from a list of options.",
+        backstory="You rank physics problem critiques and pick the clearest and most useful one.",
+        llm=judge_llm,
+        allow_delegation=False,
+        verbose=False,
+    )
+
     problem_refiner = Agent(
         role="Physics Problem Editor and Refiner",
         goal="Incorporate feedback from critics to refine a physics problem.",
@@ -168,6 +183,7 @@ def create_agents_and_tasks():
     return (
         self_containment_critic,
         difficulty_critic,
+        critique_judge,
         problem_refiner,
         task_critique_self_containment,
         task_critique_difficulty,
@@ -259,10 +275,47 @@ def parse_json_output(output_str):
         print(f"Error parsing JSON output: {e}")
         return None
 
-def process_paper(paper_data):
+def run_best_of_n_critique(agent, task, inputs, n, judge_agent):
+    outputs = []
+    for _ in range(n):
+        crew = Crew(agents=[agent], tasks=[task], verbose=False)
+        result = crew.kickoff(inputs=inputs)
+        result_str = str(result.raw) if hasattr(result, "raw") else str(result)
+        outputs.append(result_str)
+
+    parsed = [parse_json_output(o) for o in outputs]
+    valid_indices = [i for i, p in enumerate(parsed) if p]
+
+    if not valid_indices:
+        return {"error": "Failed to parse"}, outputs[0]
+
+    if len(valid_indices) == 1:
+        idx = valid_indices[0]
+    else:
+        joined = "\n".join([f"Critique {i+1}: {outputs[i]}" for i in range(len(outputs))])
+        judge_task = Task(
+            description=f"""Select the best critique. Reply with a single integer between 1 and {len(outputs)}.\n{joined}""",
+            expected_output="The number of the best critique",
+            agent=judge_agent,
+        )
+        try:
+            judge_crew = Crew(agents=[judge_agent], tasks=[judge_task], verbose=False)
+            judge_result = judge_crew.kickoff()
+            judge_str = str(judge_result.raw) if hasattr(judge_result, "raw") else str(judge_result)
+            m = re.search(r"(\d+)", judge_str)
+            idx = int(m.group(1)) - 1 if m else valid_indices[0]
+            if idx not in range(len(outputs)):
+                idx = valid_indices[0]
+        except Exception:
+            idx = valid_indices[0]
+
+    return parsed[idx], outputs[idx]
+
+def process_paper(paper_data, n=3):
     (
         self_containment_critic,
         difficulty_critic,
+        critique_judge,
         problem_refiner,
         task_critique_self_containment,
         task_critique_difficulty,
@@ -299,29 +352,29 @@ def process_paper(paper_data):
         debug_outputs = {}
 
         try:
-            sc_crew = Crew(agents=[self_containment_critic], tasks=[task_critique_self_containment], verbose=False)
-            sc_result = sc_crew.kickoff(inputs=inputs)
-            sc_str = str(sc_result.raw) if hasattr(sc_result, "raw") else str(sc_result)
+            sc_parsed, sc_str = run_best_of_n_critique(
+                self_containment_critic,
+                task_critique_self_containment,
+                inputs,
+                n,
+                critique_judge,
+            )
             debug_outputs["self_containment_raw"] = sc_str
-            sc_parsed = parse_json_output(sc_str)
-            if sc_parsed:
-                critiques["self_containment"] = sc_parsed
-            else:
-                raise ValueError("Failed to parse JSON output")
+            critiques["self_containment"] = sc_parsed
         except Exception as e:
             print(f"Error in self-containment critique: {e}")
             critiques["self_containment"] = {"error": str(e)}
 
         try:
-            diff_crew = Crew(agents=[difficulty_critic], tasks=[task_critique_difficulty], verbose=False)
-            diff_result = diff_crew.kickoff(inputs=inputs)
-            diff_str = str(diff_result.raw) if hasattr(diff_result, "raw") else str(diff_result)
+            diff_parsed, diff_str = run_best_of_n_critique(
+                difficulty_critic,
+                task_critique_difficulty,
+                inputs,
+                n,
+                critique_judge,
+            )
             debug_outputs["difficulty_raw"] = diff_str
-            diff_parsed = parse_json_output(diff_str)
-            if diff_parsed:
-                critiques["difficulty"] = diff_parsed
-            else:
-                raise ValueError("Failed to parse JSON output")
+            critiques["difficulty"] = diff_parsed
         except Exception as e:
             print(f"Error in difficulty critique: {e}")
             critiques["difficulty"] = {"error": str(e)}
@@ -449,6 +502,12 @@ def main():
         default=1,
         help="Number of parallel workers to process papers"
     )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=3,
+        help="Number of samples for each critique"
+    )
     args = parser.parse_args()
 
     try:
@@ -467,7 +526,7 @@ def main():
     total_problems_removed = 0
 
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        future_to_paper = {executor.submit(process_paper, p): p["paper_id"] for p in all_papers_data}
+        future_to_paper = {executor.submit(process_paper, p, args.samples): p["paper_id"] for p in all_papers_data}
         for future in as_completed(future_to_paper):
             result = future.result()
             if result:
