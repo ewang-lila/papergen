@@ -8,6 +8,7 @@ import glob
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from crewai import Crew, Agent, Task, LLM
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 # Load environment variables from .env file
 load_dotenv()
@@ -16,6 +17,19 @@ load_dotenv()
 
 google_api_key = os.getenv("GOOGLE_API_KEY")
 openai_api_key = os.getenv("OPENAI_API_KEY")
+
+class SelfContainmentCritique(BaseModel):
+    is_self_contained: bool
+    critique: str
+    suggestion: str
+
+class DifficultyCritique(BaseModel):
+    is_non_trivial: bool
+    critique: str
+
+class RefinedProblem(BaseModel):
+    problem_statement: str
+    final_solution: str
 
 def create_agents_and_tasks():
     refiner_llm = LLM(
@@ -101,6 +115,7 @@ def create_agents_and_tasks():
   """,
         expected_output="A valid JSON object containing the fields 'is_self_contained', 'critique', and 'suggestion'.",
         agent=self_containment_critic,
+        output_json=SelfContainmentCritique,
     )
 
     task_critique_difficulty = Task(
@@ -131,6 +146,7 @@ def create_agents_and_tasks():
   """,
       expected_output="A valid JSON object containing the fields 'is_non_trivial' and 'critique'.",
       agent=difficulty_critic,
+      output_json=DifficultyCritique,
     )
 
     task_refine_problem = Task(
@@ -163,6 +179,7 @@ def create_agents_and_tasks():
       expected_output="A valid JSON object with exactly two keys: 'problem_statement' and 'final_solution'. No other text or formatting.",
       agent=problem_refiner,
       context=[task_critique_self_containment, task_critique_difficulty],
+      output_json=RefinedProblem,
     )
 
     return (
@@ -301,13 +318,11 @@ def process_paper(paper_data):
         try:
             sc_crew = Crew(agents=[self_containment_critic], tasks=[task_critique_self_containment], verbose=False)
             sc_result = sc_crew.kickoff(inputs=inputs)
-            sc_str = str(sc_result.raw) if hasattr(sc_result, "raw") else str(sc_result)
-            debug_outputs["self_containment_raw"] = sc_str
-            sc_parsed = parse_json_output(sc_str)
+            sc_parsed = sc_result.json_dict
             if sc_parsed:
                 critiques["self_containment"] = sc_parsed
             else:
-                raise ValueError("Failed to parse JSON output")
+                raise ValueError("Failed to get structured output from self-containment critique")
         except Exception as e:
             print(f"Error in self-containment critique: {e}")
             critiques["self_containment"] = {"error": str(e)}
@@ -315,13 +330,11 @@ def process_paper(paper_data):
         try:
             diff_crew = Crew(agents=[difficulty_critic], tasks=[task_critique_difficulty], verbose=False)
             diff_result = diff_crew.kickoff(inputs=inputs)
-            diff_str = str(diff_result.raw) if hasattr(diff_result, "raw") else str(diff_result)
-            debug_outputs["difficulty_raw"] = diff_str
-            diff_parsed = parse_json_output(diff_str)
+            diff_parsed = diff_result.json_dict
             if diff_parsed:
                 critiques["difficulty"] = diff_parsed
             else:
-                raise ValueError("Failed to parse JSON output")
+                raise ValueError("Failed to get structured output from difficulty critique")
         except Exception as e:
             print(f"Error in difficulty critique: {e}")
             critiques["difficulty"] = {"error": str(e)}
@@ -353,13 +366,11 @@ def process_paper(paper_data):
                 verbose=True,
             )
             refiner_result = refiner_crew.kickoff(inputs=inputs)
-            refiner_raw = str(refiner_result.raw) if hasattr(refiner_result, "raw") else str(refiner_result)
-            debug_outputs["refiner_raw"] = refiner_raw
-            refined_parsed = parse_json_output(refiner_raw)
+            refined_parsed = refiner_result.json_dict
             if refined_parsed and "problem_statement" in refined_parsed and "final_solution" in refined_parsed:
                 clean_refined_problem = {
-                    "problem_statement": str(refined_parsed["problem_statement"]),
-                    "final_solution": str(refined_parsed["final_solution"]),
+                    "problem_statement": refined_parsed["problem_statement"],
+                    "final_solution": refined_parsed["final_solution"],
                 }
                 refined_problems_for_paper.append(clean_refined_problem)
 
@@ -376,7 +387,7 @@ def process_paper(paper_data):
                 }
                 critiques_for_paper.append(critique_entry)
             else:
-                raise ValueError("Failed to parse JSON output or missing required fields")
+                raise ValueError("Failed to get structured output or missing required fields from refinement")
         except Exception as e:
             was_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", False)
             if was_non_trivial:
