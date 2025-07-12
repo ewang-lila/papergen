@@ -61,6 +61,7 @@ def generate_summary_table(critiques_data):
     stats = {
         "self_containment": {"pass": 0, "fail": 0},
         "difficulty": {"pass": 0, "fail": 0, "removed": 0},
+        "useful_derivation": {"pass": 0, "fail": 0, "removed": 0},
         "refinement": {"success": 0, "fail": 0}
     }
     
@@ -83,6 +84,14 @@ def generate_summary_table(critiques_data):
                 stats["difficulty"]["pass"] += 1
             else:
                 stats["difficulty"]["fail"] += 1
+
+        if "useful_derivation" in critiques and isinstance(critiques["useful_derivation"], dict):
+            if is_removed and not critiques["useful_derivation"].get("is_useful_derivation", True):
+                stats["useful_derivation"]["removed"] += 1
+            elif critiques["useful_derivation"].get("is_useful_derivation", False):
+                stats["useful_derivation"]["pass"] += 1
+            else:
+                stats["useful_derivation"]["fail"] += 1
         
         # Check refinement success (only for non-removed problems)
         if not is_removed:
@@ -141,6 +150,9 @@ def format_critique_section(critique_type, critique_data):
         elif critique_type == "difficulty":
             status = critique_data.get("is_non_trivial", False)
             status_text = "Non-trivial" if status else "Trivial"
+        elif critique_type == "useful_derivation":
+            status = critique_data.get("is_useful_derivation", False)
+            status_text = "Useful" if status else "Useless"
         else:
             status = False
             status_text = "Unknown"
@@ -216,6 +228,11 @@ def generate_critiques_section(critiques_data):
         if "difficulty" in critiques:
             critiques_tex += "\\paragraph*{Difficulty Critique:}\n"
             critiques_tex += format_critique_section("difficulty", critiques["difficulty"])
+            critiques_tex += "\n"
+
+        if "useful_derivation" in critiques:
+            critiques_tex += "\\paragraph*{Useful Derivation Critique:}\n"
+            critiques_tex += format_critique_section("useful_derivation", critiques["useful_derivation"])
             critiques_tex += "\n"
         
         # Refined problem
