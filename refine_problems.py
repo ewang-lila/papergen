@@ -27,6 +27,10 @@ class DifficultyCritique(BaseModel):
     is_non_trivial: bool
     critique: str
 
+class UsefulDerivationCritique(BaseModel):
+    is_useful_derivation: bool
+    critique: str
+
 class RefinedProblem(BaseModel):
     problem_statement: str
     final_solution: str
@@ -62,6 +66,17 @@ def create_agents_and_tasks():
         backstory=(
             "You are an expert physicist designing extremely challenging problems for PhD qualifying exams. "
             "Determine whether the problem is sufficiently difficult and requires an advanced, multi-step chain of reasoning designed to challenge the most advanced physics PhD students."
+        ),
+        llm=critic_llm,
+        allow_delegation=False,
+        verbose=True,
+    )
+
+    derivation_usefulness_critic = Agent(
+        role="Derivation Usefulness Reviewer",
+        goal="Determine if the problem asks for a useful derivation that is not explicitly given.",
+        backstory=(
+            "You analyze physics problems to ensure they require deriving a new result from the paper rather than merely verifying an equation that is already provided."
         ),
         llm=critic_llm,
         allow_delegation=False,
@@ -149,6 +164,53 @@ def create_agents_and_tasks():
       output_json=DifficultyCritique,
     )
 
+    task_critique_usefulness = Task(
+      description="""Evaluate whether the problem below asks for a useful derivation from the paper.
+
+A 'useful derivation' requires the user to derive a new and unseen result that is NOT given in the problem statement. The problem is USELESS if the solution is already contained in the problem statement or only asks for proof or verification of a specific result. The problem is acceptable only if it requires several complex steps to reach the desired result.
+
+Check for these patterns of BAD problems:
+1. The task asks the user to show or prove a specific equation that is already provided.
+2. The problem statement contains the exact mathematical expression that is also the final solution.
+3. The problem is based on fewer than four steps in the paper's derivation.
+
+The problem should ask the user to "find", "calculate", or "derive" an expression for a quantity that is not already provided AND requires significant extra work to derive.
+IMPORTANT: a complicated problem statement with lots of equations and symbols does not mean that the problem is difficult.
+
+Problem Statement: {problem_statement}
+Final Solution: {final_solution}
+
+CRITICAL: Your response MUST be ONLY a valid JSON object with NO other text before or after it.
+The JSON object MUST have exactly these keys:
+- "is_useful_derivation": boolean (false if the solution is given away in the problem)
+- "critique": string (a brief, one-sentence summary of your findings)
+
+Example of a BAD problem (is_useful_derivation: false):
+---
+Problem Statement:
+"Background: [Background on quantum many-body systems...]\nTask: Starting from the definitions above and using the approximated structure of many-body eigenstates and locality arguments, derive that the quantum relative entropy $S(\rho_A(t) \Vert \rho_d)$ can be approximated by the difference of von Neumann entropies,
+S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]."
+Final Solution: "S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]"
+Critique: "The problem is not useful because it asks the user to derive an equation that is already explicitly provided in the task description, making it a simple verification."
+---
+
+Example of a GOOD problem (is_useful_derivation: true):
+---
+Problem Statement:
+"Background: [Background on quantum many-body systems...]\nTask: Starting from the definitions above and using the approximated structure of many-body eigenstates and locality arguments, find an exact expression for the quantum relative entropy $S(\rho_A(t) \Vert \rho_d)$ in terms of the von Neumann entropies of $\rho_A(t)$ and $\rho_d$."
+Final Solution: "S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]"
+Critique: "This problem is too simple; the final expression merely plugs in two new variables using a difference."
+---
+
+Now, evaluate this problem:
+Problem Statement: {problem_statement}
+Final Solution: {final_solution}
+""",
+      expected_output="A valid JSON object containing the fields 'is_useful_derivation' and 'critique'.",
+      agent=derivation_usefulness_critic,
+      output_json=UsefulDerivationCritique,
+    )
+
     task_refine_problem = Task(
       description="""Your task is to refine a physics problem based on specific feedback from two expert critics.
   You must address every issue raised in the critiques you are provided, but only address the issues that are raised. If no issues are raised, you must leave the problem as is.
@@ -178,16 +240,18 @@ def create_agents_and_tasks():
   """,
       expected_output="A valid JSON object with exactly two keys: 'problem_statement' and 'final_solution'. No other text or formatting.",
       agent=problem_refiner,
-      context=[task_critique_self_containment, task_critique_difficulty],
+      context=[task_critique_self_containment, task_critique_difficulty, task_critique_usefulness],
       output_json=RefinedProblem,
     )
 
     return (
         self_containment_critic,
         difficulty_critic,
+        derivation_usefulness_critic,
         problem_refiner,
         task_critique_self_containment,
         task_critique_difficulty,
+        task_critique_usefulness,
         task_refine_problem,
     )
 
@@ -280,9 +344,11 @@ def process_paper(paper_data):
     (
         self_containment_critic,
         difficulty_critic,
+        derivation_usefulness_critic,
         problem_refiner,
         task_critique_self_containment,
         task_critique_difficulty,
+        task_critique_usefulness,
         task_refine_problem,
     ) = create_agents_and_tasks()
     paper_id = paper_data["paper_id"]
@@ -339,7 +405,20 @@ def process_paper(paper_data):
             print(f"Error in difficulty critique: {e}")
             critiques["difficulty"] = {"error": str(e)}
 
+        try:
+            useful_crew = Crew(agents=[derivation_usefulness_critic], tasks=[task_critique_usefulness], verbose=False)
+            useful_result = useful_crew.kickoff(inputs=inputs)
+            useful_parsed = useful_result.json_dict
+            if useful_parsed:
+                critiques["useful_derivation"] = useful_parsed
+            else:
+                raise ValueError("Failed to get structured output from derivation usefulness critique")
+        except Exception as e:
+            print(f"Error in derivation usefulness critique: {e}")
+            critiques["useful_derivation"] = {"error": str(e)}
+
         is_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", True)
+        is_useful = critiques.get("useful_derivation", {}).get("is_useful_derivation", True)
 
         if not is_non_trivial:
             critique_text = critiques.get("difficulty", {}).get("critique", "No critique provided.")
@@ -359,10 +438,28 @@ def process_paper(paper_data):
             processed += 1
             continue
 
+        if not is_useful:
+            critique_text = critiques.get("useful_derivation", {}).get("critique", "Marked as useless derivation")
+            removed += 1
+            critique_entry = {
+                "paper_id": paper_id,
+                "problem_index": i,
+                "original_problem": {
+                    "problem_statement": problem["problem_statement"],
+                    "final_solution": problem["final_solution"],
+                },
+                "critiques": critiques,
+                "removed": True,
+                "removal_reason": f"Useless derivation: {critique_text}",
+            }
+            critiques_for_paper.append(critique_entry)
+            processed += 1
+            continue
+
         try:
             refiner_crew = Crew(
-                agents=[self_containment_critic, difficulty_critic, problem_refiner],
-                tasks=[task_critique_self_containment, task_critique_difficulty, task_refine_problem],
+                agents=[self_containment_critic, difficulty_critic, derivation_usefulness_critic, problem_refiner],
+                tasks=[task_critique_self_containment, task_critique_difficulty, task_critique_usefulness, task_refine_problem],
                 verbose=True,
             )
             refiner_result = refiner_crew.kickoff(inputs=inputs)
@@ -390,7 +487,8 @@ def process_paper(paper_data):
                 raise ValueError("Failed to get structured output or missing required fields from refinement")
         except Exception as e:
             was_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", False)
-            if was_non_trivial:
+            was_useful = critiques.get("useful_derivation", {}).get("is_useful_derivation", False)
+            if was_non_trivial and was_useful:
                 clean_original = {
                     "problem_statement": problem["problem_statement"],
                     "final_solution": problem["final_solution"],
