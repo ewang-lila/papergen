@@ -2,26 +2,24 @@ LLM_PROMPT_TEMPLATE = """
 You are an expert researcher in physics. 
 
 ## Task  
-You are provided a published research paper in physics. The paper's main results can be divided into two clear sections. 
+You are provided a published research paper in physics. 
 
-Your task: create ONE problem based on the {segment} of the paper's derivations and results. The problem should be as challenging as possible using the paper's work. 
+Your task: create ONE problem based on the paper's derivations and results. The problem should be as challenging as possible using the paper's work. 
 Note that some papers place their main results in the appendix; if this is the case, definitely consider the results and derivations from the appendix when crafting your problem.
-There is already a problem for the other half of the paper, so make sure your problem captures the area you have been given.
-The goal is to create a problem that is maximally difficult for a professional physicist, by having them rederive a complex result from the paper. They have not seen the paper before. 
-The problem must require the student to rederive an exact result from the paper.
+The goal is to create a problem that is maximally difficult for a professional physicist, by having them rederive a complex result from the paper. They have not seen the paper before and will not be shown the paper. 
+The problem must require the student to rederive an exact result from the paper, using only the background information and setting of the paper.
 
 ---
 
 ## Strict requirements  
 
-- Independence. Every question must be *fully self-contained* and exactly follow the steps provided in the paper: embed all notation, assumptions, and context that the student needs *inside that single question*. Under no circumstances should you refer to a "previous problem", "same system", "as shown in the paper", "the appendix", etc. There should be no references to any material from the paper in the problem statement, since your problem statement should fully capture the work of the paper.
+- Independence. Every question must be *fully self-contained* and exactly follow the steps provided in the paper: embed all notation, assumptions, and context that the student needs *inside that single question*. Under no circumstances should you refer to a "previous problem", "same system", "as shown in the paper", "the appendix", etc. There should be no references to any material from the paper in the problem statement, since your problem statement should include all necessary information for solving the problem.
 - Focus. Each question must ask the student to derive one analytical result that appears in the paper (e.g. a specific equation). Do not ask to "show," "prove," or "verify" a result, since the grader only considers the student's final result. The question also may not rely on data analysis; it should only involve derivations and reasoning.
-- To create the problem, note that the paper contains many equations that each follow from previous equations. You should create a problem that requires the student to derive an equation or result in the paper that follows from equations that appeared several steps earlier in the paper; for example, by going from equation 1 and the surrounding background to equation 5 in the paper.
+- To create the problem, note that the paper contains many equations that each follow from previous equations. You should create a problem that requires the student to derive an equation or result in the paper that follows from equations that appeared several steps earlier in the paper; for example, by going from equations 1 and 2 to equation 10 in the paper.
 - Difficulty. A problem should require many steps and have a unique, objectively checkable answer that is directly written in the paper. I.e., every problem must have a solution that directly corresponds to a result in the paper. The problem must be mathematically nontrivial and as challenging as possible, but still self-contained and solvable. The final answer should be a mathematical expression, not a simple number or single variable. Do **NOT** choose minor results like definitions, substitutions, or auxiliary bounds. The final solution expression should be one of the most complex results in the paper.
 - Equation-oriented. The problem should guide students through deriving a specific result that appears in the paper, not proving a general concept.
-- Non-duplication. Since you're creating problem {problem_number} of 2, ensure this problem focuses on a different section of reasoning and work from the other problems. If you are writing problem 2, you can include results dependent on the first half of the paper as long as you rewrite *all* the required context for the problem.
 - Structure. Begin each question with a short "Background" paragraph that defines all symbols and states all assumptions used later in that question, as well as some context. End with a "Task" sentence that states exactly what the student must show, without revealing the final expression. Your problem should ask for exactly *one* expression.
-- Solutions section. After each question, give the ground-truth solution expression from the paper. Only output the *final solution* in *one* LaTeX \boxed{{}} expression, after the "Solution:" text. There should be no other text in the \\boxed{{}} expression other than the final, simplified solution.
+- Solutions section. After each question, give the precise solution expression from the paper. Only output the *final solution* in *one* LaTeX \boxed{{}} expression, after the "Solution:" text. There should be no other text in the \\boxed{{}} expression other than the final, simplified solution.
 - No extraneous parts. Omit numerical verification, coding exercises, open-ended extensions, grading rubrics, etc. Write only the problem (i.e., the background and task) and the solution. DO NOT INCLUDE ANYTHING ELSE IN YOUR RESPONSE!
 - Format everything in proper Markdown and LaTeX code. Do not use any special characters or unicode characters in your response; use *only* LaTeX commands for ALL symbols and characters.
 

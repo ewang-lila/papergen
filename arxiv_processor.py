@@ -18,7 +18,7 @@ load_dotenv()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-num_papers = 10
+num_papers = 30
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
@@ -225,7 +225,7 @@ def process_archive(archive: str, model: str):
     segments = ["first half", "second half"]
     for i, segment in enumerate(segments):
         print(
-            f"Generating problem {i+1} for the {segment} of the paper using model: {model}..."
+            f"Generating problem {i+1} of the paper using model: {model}..."
         )
         if model == "gemini":
             raw_output = generate_single_problem_gemini(combined_tex_content, segment, i + 1)
