@@ -214,8 +214,9 @@ def generate_single_problem_gemini(tex_content: str, segment: str, problem_numbe
         return None
 
 def process_archive(archive: str, model: str):
-    print(f"Processing archive: {archive}")
+    print(f'Starting processing for {archive}...')
     combined_tex_content = extract_and_combine_tex_files(archive)
+    print(f'Tex content extracted for {archive}.')
 
     if not combined_tex_content:
         print(f"Could not find/extract .tex content from {archive}")
@@ -224,9 +225,7 @@ def process_archive(archive: str, model: str):
     problems_data = []
     segments = ["first half", "second half"]
     for i, segment in enumerate(segments):
-        print(
-            f"Generating problem {i+1} of the paper using model: {model}..."
-        )
+        print(f'Generating problem for segment {segment} using {model}...')
         if model == "gemini":
             raw_output = generate_single_problem_gemini(combined_tex_content, segment, i + 1)
         else:
@@ -254,10 +253,11 @@ def process_archive(archive: str, model: str):
     with open(output_filename, "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=4, ensure_ascii=False)
 
-    print(f"All problems saved to {output_filename}")
+    print(f'Problems saved for {archive}.')
     return output_data
 
 def main():
+    print('Starting main execution...')
     parser = argparse.ArgumentParser(description="Fetch arXiv papers, process them with an LLM, and save the results.")
     parser.add_argument(
         "--no-download",
@@ -286,6 +286,7 @@ def main():
     args = parser.parse_args()
 
     setup_directories()
+    print('Directories set up.')
 
     if args.no_download:
         print("Skipping download. Using existing files.")
@@ -296,12 +297,15 @@ def main():
         if args.limit:
             print(f"Limiting processing to the first {args.limit} papers.")
             downloaded_archives = downloaded_archives[:args.limit]
+        print(f'Using {len(downloaded_archives)} existing archives.')
     else:
         print("Searching for and downloading new papers.")
         downloaded_archives = search_and_download_papers(max_results_per_category=num_papers)
+        print(f'Downloaded {len(downloaded_archives)} archives.')
 
     results = []
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        print(f'Starting processing with {args.workers} workers...')
         future_to_archive = {executor.submit(process_archive, archive, args.model): archive for archive in downloaded_archives}
         for future in as_completed(future_to_archive):
             result = future.result()
@@ -313,6 +317,7 @@ def main():
         with open(aggregated_filename, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=4, ensure_ascii=False)
         print(f"Aggregated results saved to {aggregated_filename}")
+        print(f'Aggregated results saved.')
 
 if __name__ == "__main__":
     main() 
