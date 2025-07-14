@@ -197,9 +197,9 @@ Critique: "The problem is not useful because it asks the user to derive an equat
 Example of a GOOD problem (is_useful_derivation: true):
 ---
 Problem Statement:
-"Background: [Background on quantum many-body systems...]\nTask: Starting from the definitions above and using the approximated structure of many-body eigenstates and locality arguments, find an exact expression for the quantum relative entropy $S(\rho_A(t) \Vert \rho_d)$ in terms of the von Neumann entropies of $\rho_A(t)$ and $\rho_d$."
-Final Solution: "S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]"
-Critique: "This problem is too simple; the final expression merely plugs in two new variables using a difference."
+"Background: [Background on statistical mechanics and networks...]\nTask: Using asymptotic analysis, derive the leading behavior of $N_d(n)$ for fixed $d$ and large $n$, i.e., obtain an explicit asymptotic formula for $N_d(n)$ in terms of $n$ and $d$."
+Final Solution: "N_d(n) \cong e\, n! \frac{(\ln n)^d}{d!}"
+Critique: "This problem is sufficiently difficult, as it requires advanced approximation techniques, knowledge of graduate-level statistical mechanics, and graph theory."
 ---
 
 Now, evaluate this problem:

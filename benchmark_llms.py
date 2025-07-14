@@ -190,7 +190,7 @@ def calculate_summary_statistics(results, models):
 def main():
     parser = argparse.ArgumentParser(description="Benchmark LLMs on physics problems.")
     parser.add_argument(
-        "--models",
+        "--model",
         nargs="+",
         default=SUPPORTED_MODELS,
         choices=SUPPORTED_MODELS,
@@ -217,8 +217,8 @@ def main():
     args = parser.parse_args()
 
     # Dynamically set output filename based on models chosen
-    if len(args.models) == 1:
-        model_name = args.models[0].replace("openai/", "").replace("/", "-")
+    if len(args.model) == 1:
+        model_name = args.model[0].replace("openai/", "").replace("/", "-")
         output_dir = f"output/results/{model_name}"
         os.makedirs(output_dir, exist_ok=True)
         args.output_file = f"{output_dir}/benchmark_results_{model_name}.json"
@@ -246,7 +246,7 @@ def main():
         problem_result = problem.copy()
         problem_result["model_outputs"] = {}
 
-        for model_name in tqdm(args.models, desc=f"Benchmarking models on {problem['paper_id']}", leave=False):
+        for model_name in tqdm(args.model, desc=f"Benchmarking models on {problem['paper_id']}", leave=False):
             model_solution_full = get_model_response(model_name, problem["problem_statement"])
             
             # Extract the boxed part of the model's solution using the robust function
@@ -280,7 +280,7 @@ def main():
 
         results.append(problem_result)
 
-    summary = calculate_summary_statistics(results, args.models)
+    summary = calculate_summary_statistics(results, args.model)
 
     final_output = {
         "results": results,

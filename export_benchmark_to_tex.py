@@ -96,7 +96,7 @@ def generate_summary_table(summary_data):
     return table_header + table_rows + table_footer
 
 
-def generate_problem_parts(results_data, base_tex_dir, num_files=5):
+def generate_problem_parts(results_data, base_tex_dir, num_files=7):
     """Generates LaTeX for detailed problems, split into multiple files."""
     if not results_data:
         return []
@@ -188,7 +188,7 @@ def export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name)
 
     # Generate content
     summary_table_tex = generate_summary_table(data.get("summary", {}))
-    problem_files = generate_problem_parts(data.get("results", []), base_tex_dir, num_files=5)
+    problem_files = generate_problem_parts(data.get("results", []), base_tex_dir, num_files=10)
 
     # Combine all parts
     final_tex = TEX_TEMPLATE_HEADER
