@@ -1,25 +1,31 @@
 from flytekit import task, workflow, Resources, Secret, ImageSpec
 import subprocess
 import sys
+import glob
+import os
+import pathlib
+import random
+
+import numpy as np
+import pandas as pd
 
 from typing import Optional
 
 custom_image = ImageSpec(
-    name="o3-paper-converter",
-    base_image="python:3.11-slim",
-    packages=["uv"],
-    pip_index="https://pypi.org/simple",
+    base_image="579102688835.dkr.ecr.us-east-1.amazonaws.com/ssi/flyte:dev-dist-latest",
+    name="ssi",
     registry="579102688835.dkr.ecr.us-east-1.amazonaws.com",
+    python_version="3.11",
+    requirements="uv.lock",
+    pip_secret_mounts=[(os.path.join(pathlib.Path.home(), ".netrc"), "/root/.netrc")],
     commands=[
         "uv pip install --system -r requirements.txt"
     ],
-    python_version="3.11",
-    source_root=".",
 )
 
 @task(
     container_image=custom_image,
-    requests=Resources(cpu="1", mem="2Gi"),
+    requests=Resources(cpu="4", mem="4Gi"),
     environment={
         "WANDB_API_KEY": "op://Cloud Native/wandb/token",
         "OPENAI_API_KEY": "op://Cloud Native/openai-ml-token/password",
