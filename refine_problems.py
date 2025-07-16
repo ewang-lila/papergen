@@ -191,7 +191,7 @@ Problem Statement:
 "Background: [Background on quantum many-body systems...]\nTask: Starting from the definitions above and using the approximated structure of many-body eigenstates and locality arguments, derive that the quantum relative entropy $S(\rho_A(t) \Vert \rho_d)$ can be approximated by the difference of von Neumann entropies,
 S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]."
 Final Solution: "S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]"
-Critique: "The problem is not useful because it asks the user to derive an equation that is already explicitly provided in the task description, making it a simple verification."
+Critique: "The problem is useless because it asks the user to derive an equation that is explicitly provided in the task description, making it trivial for the problem-solver since they already know the final solution."
 ---
 
 Example of a GOOD problem (is_useful_derivation: true):
