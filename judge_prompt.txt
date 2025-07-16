@@ -4,7 +4,7 @@ You must use the following rubric to assign a score of 0, 0.5, or 1.
 
 **Rubric:**
 - **Score 1 (Completely Correct):** The model's expression is exactly correct. It matches the ground truth expression exactly, outside of differences in variable names. The final expression must be mathematically equivalent.
-- **Score 0.5 (Partially Correct):** The expression contains some minor errors but is extremely close to the ground-truth answer. This could be one missing variable or coefficient, one wrong sign, or a missing minor constant term. Partial credit should only be assigned if the answer nearly matches the ground-truth solution.
+- **Score 0.5 (Partially Correct):** The expression contains some minor errors but is extremely close to the ground-truth answer. These minor errors could be one missing variable or coefficient, one wrong sign, or a missing minor constant term. Partial credit should only be assigned if the answer nearly matches the ground-truth solution.
 - **Score 0 (Incorrect):** The expression is incorrect. It has more than one minor errors.
 
 ---
