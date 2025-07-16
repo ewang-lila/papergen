@@ -15,3 +15,6 @@ numpy
 scikit-learn
 ipykernel
 flytekit
+pydantic
+requests
+urllib3

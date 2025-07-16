@@ -1,5 +1,7 @@
 import openai
 import anthropic
+import requests
+import urllib3
 from google import genai
 from google.genai import types
 import json
@@ -13,6 +15,9 @@ load_dotenv()
 
 # Configure APIs
 openai.api_key = os.getenv("OPENAI_API_KEY")
+OPENWEBUI_API_KEY = os.getenv("OPENWEBUI_API_KEY")
+OPENWEBUI_API_BASE_URL = os.getenv("OPENWEBUI_API_BASE_URL", "https://open-webui.ml.lilasci.io/api")
+
 
 SUPPORTED_MODELS = [
     "gpt-4o",
@@ -23,6 +28,8 @@ SUPPORTED_MODELS = [
     "claude-4",
     "gemini-2.5-pro",
     "gemini-2.5-flash-lite-preview-06-17",
+    "owui/qwen3:4b",
+    "owui/qwen3:32b"
 ]
 
 JUDGE_MODEL = "gpt-4.1-mini"
@@ -82,6 +89,33 @@ def get_model_response(model_name, problem_statement):
             
             response = openai.chat.completions.create(**params)
             return response.choices[0].message.content
+        elif model_name.startswith("owui/"):
+            if not OPENWEBUI_API_KEY:
+                return "Error: OPENWEBUI_API_KEY environment variable not set."
+            
+            headers = {
+                "Authorization": f"Bearer {OPENWEBUI_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {
+                "model": model_name.replace("owui/", ""),
+                "messages": [
+                    {"role": "system", "content": MODEL_PROMPT},
+                    {"role": "user", "content": problem_statement}
+                ],
+                "stream": False,
+            }
+
+            response = requests.post(
+                f"{OPENWEBUI_API_BASE_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                verify=False,
+                proxies={ "http": None, "https": None } # Explicitly disable proxies
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
         elif "claude" in model_name.lower():
             # Anthropic API call
             client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
