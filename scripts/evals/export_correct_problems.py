@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Extract problems that a given model answered perfectly.
 
-Usage (defaults shown):
+Usage:
 
+    # Basic usage - paths are inferred from the model name
+    python export_correct_problems.py --model o3-mini
+
+    # Explicitly specify paths
     python export_correct_problems.py \
-        --benchmark output/results/o3-mini/benchmark_results_o3-mini.json \
         --model o3-mini \
-        --output output/problems/o3_correct_problems.json
+        --benchmark path/to/your/benchmark_results_o3-mini.json \
+        --output path/to/your/o3_correct_problems.json
 
 The script reads the benchmark results file (format produced by *benchmark_llms.py*),
 filters for problems where the chosen model has score == 1 (or 1.0), and
@@ -20,10 +24,6 @@ import json
 import os
 from collections import defaultdict
 from typing import Any, Dict, List
-
-
-DEFAULT_BENCHMARK_PATH = "output/results/o3-mini/benchmark_results_o3-mini.json"
-DEFAULT_OUTPUT_PATH = "output/problems/o3_correct_problems.json"
 
 
 def load_benchmark(path: str) -> List[Dict[str, Any]]:
@@ -84,11 +84,19 @@ def main() -> None:
         description="Export problems a model solved perfectly to a new JSON file.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--benchmark", default=DEFAULT_BENCHMARK_PATH, help="Path to benchmark_results JSON file.")
-    parser.add_argument("--model", default="o3-mini", help="Model key to inspect (e.g., 'o3-mini').")
-    parser.add_argument("--output", default=DEFAULT_OUTPUT_PATH, help="Destination JSON file for extracted problems.")
+    parser.add_argument("--model", required=True, help="Model key to inspect (e.g., 'o3-mini').")
+    parser.add_argument("--benchmark", help="Path to benchmark_results JSON file. If not provided, it will be inferred from the model name.")
+    parser.add_argument("--output", help="Destination JSON file for extracted problems. If not provided, it will be inferred from the model name.")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite the output file if it exists, instead of appending.")
 
     args = parser.parse_args()
+    
+    # Infer paths if not provided
+    if not args.benchmark:
+        args.benchmark = f"output/results/{args.model}/benchmark_results_{args.model}.json"
+    
+    if not args.output:
+        args.output = f"output/problems/{args.model}_correct_problems.json"
 
     try:
         results = load_benchmark(args.benchmark)
@@ -96,16 +104,54 @@ def main() -> None:
         print(f"[ERROR] Failed to load benchmark file: {exc}")
         return
 
-    correct = collect_correct_problems(results, args.model)
+    newly_correct = collect_correct_problems(results, args.model)
 
-    if not correct:
-        print("[WARN] No perfectly solved problems found for the specified model.")
+    existing_correct = []
+    if not args.overwrite and os.path.exists(args.output):
+        print(f"Output file {args.output} exists. Appending new results.")
+        try:
+            with open(args.output, "r", encoding="utf-8") as fp:
+                existing_correct = json.load(fp)
+            if not isinstance(existing_correct, list):
+                print(f"[WARN] Existing file {args.output} has an unexpected format and will be overwritten.")
+                existing_correct = []
+        except (json.JSONDecodeError, FileNotFoundError):
+            print(f"[WARN] Could not read or parse {args.output}. It will be overwritten.")
+            existing_correct = []
+
+    # Use a dictionary to merge and deduplicate problems
+    all_problems_by_paper: Dict[str, Dict[str, Dict[str, str]]] = defaultdict(dict)
+
+    # Process existing problems first
+    for paper in existing_correct:
+        paper_id = paper.get("paper_id")
+        if paper_id:
+            for problem in paper.get("problems", []):
+                if "problem_statement" in problem:
+                    all_problems_by_paper[paper_id][problem["problem_statement"]] = problem
+
+    # Process newly found problems, overwriting duplicates to ensure data is fresh
+    for paper in newly_correct:
+        paper_id = paper.get("paper_id")
+        if paper_id:
+            for problem in paper.get("problems", []):
+                if "problem_statement" in problem:
+                    all_problems_by_paper[paper_id][problem["problem_statement"]] = problem
+
+    # Reconstruct the list in the correct schema
+    final_problems_list = [
+        {"paper_id": pid, "problems": list(probs.values())}
+        for pid, probs in all_problems_by_paper.items()
+    ]
+
+    if not final_problems_list:
+        print("[WARN] No perfectly solved problems found to write.")
         return
 
-    write_output(correct, args.output)
+    write_output(final_problems_list, args.output)
 
-    total = sum(len(p["problems"]) for p in correct)
-    print(f"Wrote {len(correct)} papers, {total} total problems to {args.output}.")
+    total = sum(len(p["problems"]) for p in final_problems_list)
+    print(f"Wrote {len(final_problems_list)} papers, {total} total problems to {args.output}.")
 
 
 if __name__ == "__main__":

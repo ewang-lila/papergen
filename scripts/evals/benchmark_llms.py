@@ -245,21 +245,31 @@ def main():
     parser.add_argument(
         "--output-file",
         type=str,
-        default="output/results/benchmark_results.json",
-        help="File to save the benchmark results."
+        default=None,  # Set default to None to allow for dynamic generation
+        help="File to save the benchmark results. If not provided, it will be generated automatically."
     )
     args = parser.parse_args()
 
-    # Dynamically set output filename based on models chosen
-    if len(args.model) == 1:
-        model_name = args.model[0].replace("openai/", "").replace("/", "-")
-        output_dir = f"output/results/{model_name}"
-        os.makedirs(output_dir, exist_ok=True)
-        args.output_file = f"{output_dir}/benchmark_results_{model_name}.json"
+    # Dynamically set output filename if not provided
+    if args.output_file is None:
+        input_basename = os.path.splitext(os.path.basename(args.input_file))[0]
+        
+        if len(args.model) == 1:
+            model_name = args.model[0].replace("openai/", "").replace("/", "-")
+            output_dir = f"output/results/{model_name}"
+            os.makedirs(output_dir, exist_ok=True)
+            # Include input file identifier in the output filename
+            args.output_file = f"{output_dir}/benchmark_results_{model_name}_from_{input_basename}.json"
+        else:
+            # For multiple models, create a generic filename in the root of results
+            output_dir = "output/results"
+            os.makedirs(output_dir, exist_ok=True)
+            args.output_file = f"{output_dir}/benchmark_results_from_{input_basename}.json"
     else:
-        # For multiple models, use a generic filename in the root of results
-        os.makedirs("output/results", exist_ok=True)
-        args.output_file = "output/results/benchmark_results.json"
+        # If an output file is specified, ensure its directory exists
+        output_dir = os.path.dirname(args.output_file)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
 
     papers = load_problems(args.input_file)
     results = []

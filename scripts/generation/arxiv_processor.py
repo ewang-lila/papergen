@@ -22,7 +22,7 @@ with open(LLM_PROMPT_FILE, 'r') as f:
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-num_papers = 30
+npapers = 10
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
@@ -269,6 +269,12 @@ def main():
         help="Skip downloading and use existing files in the download directory."
     )
     parser.add_argument(
+        "--npapers",
+        type=int,
+        default=5
+    )
+
+    parser.add_argument(
         "--limit",
         type=int,
         default=None,
@@ -292,6 +298,27 @@ def main():
     setup_directories()
     print('Directories set up.')
 
+    npapers = args.npapers
+
+    # Load existing results to avoid overwriting
+    aggregated_filename = os.path.join(OUTPUT_DIR, "all_papers.json")
+    existing_results = {}
+    if os.path.exists(aggregated_filename):
+        print(f"Loading existing results from {aggregated_filename}...")
+        try:
+            with open(aggregated_filename, 'r', encoding='utf-8') as f:
+                existing_data = json.load(f)
+                if isinstance(existing_data, list):
+                    # Convert list to a dictionary keyed by paper_id for efficient updates
+                    for paper in existing_data:
+                        if 'paper_id' in paper:
+                            existing_results[paper['paper_id']] = paper
+        except (json.JSONDecodeError, FileNotFoundError):
+            print(f"Warning: Could not read or parse {aggregated_filename}. A new file will be created.")
+            existing_results = {}
+    
+    results_dict = existing_results
+
     if args.no_download:
         print("Skipping download. Using existing files.")
         downloaded_archives = sorted(glob.glob(os.path.join(DOWNLOAD_DIR, "*.tar.gz")))
@@ -304,22 +331,23 @@ def main():
         print(f'Using {len(downloaded_archives)} existing archives.')
     else:
         print("Searching for and downloading new papers.")
-        downloaded_archives = search_and_download_papers(max_results_per_category=num_papers)
+        downloaded_archives = search_and_download_papers(max_results_per_category=npapers)
         print(f'Downloaded {len(downloaded_archives)} archives.')
 
-    results = []
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         print(f'Starting processing with {args.workers} workers...')
         future_to_archive = {executor.submit(process_archive, archive, args.model): archive for archive in downloaded_archives}
         for future in as_completed(future_to_archive):
             result = future.result()
-            if result:
-                results.append(result)
+            if result and 'paper_id' in result:
+                # Add or update the paper's results in the dictionary
+                results_dict[result['paper_id']] = result
 
-    if results:
-        aggregated_filename = os.path.join(OUTPUT_DIR, "all_papers.json")
+    if results_dict:
+        # Convert the dictionary back to a list before saving
+        final_results_list = list(results_dict.values())
         with open(aggregated_filename, "w", encoding="utf-8") as f:
-            json.dump(results, f, indent=4, ensure_ascii=False)
+            json.dump(final_results_list, f, indent=4, ensure_ascii=False)
         print(f"Aggregated results saved to {aggregated_filename}")
         print(f'Aggregated results saved.')
 
