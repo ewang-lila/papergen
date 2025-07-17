@@ -1,4 +1,3 @@
-LLM_PROMPT_TEMPLATE = """
 You are an expert researcher in physics. 
 
 ## Task  
@@ -36,4 +35,4 @@ Solution:
 
 ---
 
-Following these instructions, read the attached paper and create the problem.""" 
+Following these instructions, read the attached paper and create the problem.

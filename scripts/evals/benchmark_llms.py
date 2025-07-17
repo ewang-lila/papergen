@@ -33,7 +33,7 @@ SUPPORTED_MODELS = [
 ]
 
 JUDGE_MODEL = "gpt-4.1-mini"
-JUDGE_PROMPT_FILE = "judge_prompt.txt"
+JUDGE_PROMPT_FILE = os.path.join(os.path.dirname(__file__), "judge_prompt.txt")
 
 MODEL_PROMPT = """You are an expert in physics. You will be given a physics problem. 
 There is only one correct final answer to the problem. 

@@ -547,7 +547,7 @@ def main():
         help="Path to the consolidated JSON file with problems to refine."
     )
     parser.add_argument(
-        "--max-problems",
+        "--limit",
         type=int,
         default=None,
         help="Maximum number of problems to process (for testing). If not specified, all problems will be processed."
@@ -599,19 +599,19 @@ def main():
             deduped_papers.append({"paper_id": paper["paper_id"], "problems": unique_probs})
     all_refined_papers = deduped_papers
 
-    if args.max_problems is not None:
+    if args.limit is not None:
         truncated = []
         count = 0
         for paper in all_refined_papers:
             new_probs = []
             for prob in paper["problems"]:
-                if count >= args.max_problems:
+                if count >= args.limit:
                     break
                 new_probs.append(prob)
                 count += 1
             if new_probs:
                 truncated.append({"paper_id": paper["paper_id"], "problems": new_probs})
-            if count >= args.max_problems:
+            if count >= args.limit:
                 break
         all_refined_papers = truncated
 

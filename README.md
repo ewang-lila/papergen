@@ -8,7 +8,7 @@ The project is designed to be run as a sequential pipeline. Here is the recommen
 First, download papers from arXiv and use an LLM to generate problems from their content. The script saves one JSON file per paper in `output/papers/initial_QA_pairs/` and downloads raw arXiv papers to `output/papers/arxiv_papers/`.
 
 ```bash
-python arxiv_processor.py
+python scripts/generation/arxiv_processor.py
 ```
 
 **Common Options:**
@@ -19,14 +19,14 @@ python arxiv_processor.py
 
 Example: Process the first 5 local papers using the `gemini` model with 5 workers.
 ```bash
-python arxiv_processor.py --no-download --model gemini --limit 5 --workers 5
+python scripts/generation/arxiv_processor.py --no-download --model gemini --limit 5 --workers 5
 ```
 
 ### Step 2: Consolidate and Filter Raw Outputs
 Next, combine the many individual JSON files into a single, clean master file. This script also filters out low-quality or malformed problems and reports on how many were removed.
 
 ```bash
-python consolidate_and_filter.py
+python scripts/generation/consolidate_and_filter.py
 ```
 This script reads all files from `output/papers/initial_QA_pairs/`, filters them, and creates a single clean dataset at `output/problems/all_papers_problems_filtered.json`.
 
@@ -35,11 +35,11 @@ Refine the generated problems for self-containment and difficulty using a critic
 
 Default: 
 ```bash
-python refine_problems.py
+python scripts/generation/refine_problems.py
 ```
 Specifying how much input data file to use: 
 ```bash
-python refine_problems.py --max-problems 10
+python scripts/generation/refine_problems.py --max-problems 10
 ```
 
 This will create a JSON file with the critiques at `output/critiques/all_critiques.json` and updated problems at `output/problems/refined_problems.json`.
@@ -48,7 +48,7 @@ This will create a JSON file with the critiques at `output/critiques/all_critiqu
 Evaluate the performance of different LLMs on the set of filtered or refined problems.
 
 ```bash
-python benchmark_llms.py
+python scripts/evals/benchmark_llms.py
 ```
 This script takes the filtered problems (by default from `output/problems/refined_problems.json`), gets solutions from the specified LLMs, uses a judge model to score them, and saves the detailed results to `output/results/benchmark_results_{model_name}.json` or `output/results/benchmark_results.json`.
 
@@ -59,14 +59,14 @@ This script takes the filtered problems (by default from `output/problems/refine
 
 Example: Benchmark `o3` on the first 10 problems using revised problems.
 ```bash
-python benchmark_llms.py --models o3 --limit 10 --input-file output/problems/refined_problems.json
+python scripts/evals/benchmark_llms.py --models o3 --limit 10 --input-file output/problems/refined_problems.json
 ```
 
 ### Step 5: Generate a LaTeX Report for Solutions
 Create a high-quality, human-readable report from the benchmark results.
 
 ```bash
-python export_benchmark_to_tex.py --model <model_name>
+python scripts/evals/export_benchmark_to_tex.py --model <model_name>
 ```
 This script reads `output/results/{model_name}/benchmark_results_{model_name}.json` and generates a comprehensive LaTeX file at `output/results/{model_name}/tex/solutions_report_{model_name}.tex`. The report is split into multiple subfiles (e.g., `problems_part_1.tex`) in a `output/results/{model_name}/tex/problem_parts/` subdirectory, which are then included in the main report.
 
@@ -79,12 +79,26 @@ pdflatex -output-directory=output/results/{model_name}/pdf output/results/{model
 Generate a LaTeX report detailing the critiques from the problem refinement process.
 
 ```bash
-python export_critiques_to_tex.py
+python scripts/evals/export_critiques_to_tex.py
 ```
 This script reads `output/critiques/all_critiques.json` and generates a LaTeX file at `output/critiques/critiques_report.tex`.
 
 ## Directory Structure
 
+-   `flyte/`: Contains Flyte workflow definitions.
+-   `scripts/`:
+    -   `generation/`: Scripts for data acquisition and problem generation.
+        -   `arxiv_processor.py`
+        -   `consolidate_and_filter.py`
+        -   `generate_solution_traces.py`
+        -   `refine_problems.py`
+        -   `prompt_template.py`
+    -   `evals/`: Scripts for LLM benchmarking and report generation.
+        -   `benchmark_llms.py`
+        -   `export_benchmark_to_tex.py`
+        -   `export_correct_problems.py`
+        -   `export_critiques_to_tex.py`
+        -   `judge_prompt.txt`
 -   `output/`:
     -   `papers/`: Contains raw data from arXiv.
         -   `arxiv_papers/`: Downloaded `.tar.gz` files.

@@ -10,10 +10,14 @@ import argparse
 import json
 import glob
 import re
-from prompt_template import LLM_PROMPT_TEMPLATE
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
+
+LLM_PROMPT_FILE = os.path.join(os.path.dirname(__file__), "prompt_template.txt")
+
+with open(LLM_PROMPT_FILE, 'r') as f:
+    LLM_PROMPT_TEMPLATE = f.read()
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
