@@ -167,10 +167,10 @@ def create_agents_and_tasks():
     task_critique_usefulness = Task(
       description="""Evaluate whether the problem below asks for a useful derivation from the paper.
 
-A 'useful derivation' requires the user to derive a new and unseen result that is NOT given in the problem statement. The problem is USELESS if the solution is already contained in the problem statement or only asks for proof or verification of a specific result. The problem is acceptable only if it requires several complex steps to reach the desired result.
+A 'useful derivation' requires the user to derive a new and unseen result that is NOT given in the problem statement. The problem is USELESS if the solution is already contained in the problem statement or only asks for a proof or verification of a specific result. The problem is acceptable only if it requires several complex steps to reach the desired result, and to provide a new result unseen in the problem statement.
 
 Check for these patterns of BAD problems:
-1. The task asks the user to show or prove a specific equation that is already provided.
+1. The task asks to show or prove a specific result that is already shown.
 2. The problem statement contains the exact mathematical expression that is also the final solution.
 3. The problem is based on fewer than four steps in the paper's derivation.
 
@@ -259,7 +259,6 @@ Final Solution: {final_solution}
 def extract_and_combine_tex_files(archive_path):
     """
     Extracts all .tex files from an arXiv source archive and combines them.
-    (Copied from arxiv_processor.py)
     """
     extract_dir = os.path.join(os.path.dirname(archive_path), os.path.basename(archive_path).replace(".tar.gz", "_extracted"))
     os.makedirs(extract_dir, exist_ok=True)
@@ -301,44 +300,6 @@ def extract_and_combine_tex_files(archive_path):
         print(f"Error processing {archive_path}: {e}")
         
     return None
-
-def parse_json_output(output_str):
-    """
-    Extracts the first valid JSON object from a string that may contain other text.
-    Handles JSON in markdown code blocks as well.
-    """
-    try:
-        # 1. Look for JSON in markdown code blocks first. This is often a reliable indicator.
-        json_match = re.search(r'```(?:json)?\s*\n?(.*?)\s*```', output_str, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1).strip()
-            try:
-                return json.loads(json_str)
-            except json.JSONDecodeError as e:
-                print(f"Found markdown block but failed to parse JSON: {e}")
-                # Continue, as there might be another JSON object outside the block
-
-        # 2. If no valid JSON in markdown, find the first substring that is a valid JSON object.
-        # This is more robust against preceding text (like "Thought: ...").
-        for match in re.finditer(r'{', output_str):
-            start_index = match.start()
-            substring = output_str[start_index:]
-            try:
-                # Use a decoder to find the first valid JSON object in the substring
-                decoder = json.JSONDecoder()
-                obj, _ = decoder.raw_decode(substring)
-                return obj  # Return the first valid object found
-            except json.JSONDecodeError:
-                # This '{' was not the start of a valid JSON object, so we continue.
-                continue
-        
-        # 3. If no JSON object is found, return None.
-        print("Warning: Could not find any valid JSON object in the output string.")
-        return None
-
-    except Exception as e:
-        print(f"Error parsing JSON output: {e}")
-        return None
 
 def process_paper(paper_data):
     (
@@ -574,17 +535,25 @@ def main():
     all_critiques = []
     total_problems_processed = 0
     total_problems_removed = 0
-
+    papers_skipped = 0
+    total_problems_in_input = sum(len(p.get("problems", [])) for p in all_papers_data)
+    
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        future_to_paper = {executor.submit(process_paper, p): p["paper_id"] for p in all_papers_data}
-        for future in as_completed(future_to_paper):
+        future_to_paper_data = {executor.submit(process_paper, p): p for p in all_papers_data}
+        for future in as_completed(future_to_paper_data):
+            paper_data = future_to_paper_data[future]
             result = future.result()
             if result:
                 refined, critiques, processed, removed = result
-                all_refined_papers.append(refined)
+                if refined:
+                    all_refined_papers.append(refined)
                 all_critiques.extend(critiques)
                 total_problems_processed += processed
                 total_problems_removed += removed
+            else:
+                # This indicates the paper was skipped, e.g., source not found.
+                papers_skipped += 1
+                print(f"Warning: Paper {paper_data.get('paper_id', 'Unknown')} was skipped and its problems were not processed.")
 
     seen_statements = set()
     deduped_papers = []
@@ -627,10 +596,16 @@ def main():
 
     print(f"\nAll papers processed. Refined problems saved to {output_filename}")
     print(f"Critiques saved to {critiques_filename}")
-    print(f"\nStatistics:")
+    
+    final_problem_count = sum(len(p.get("problems", [])) for p in all_refined_papers)
+
+    print(f"\n--- Refining Statistics ---")
+    print(f"  Total problems in input file: {total_problems_in_input}")
+    if papers_skipped > 0:
+        print(f"  Papers skipped (source file not found): {papers_skipped}")
     print(f"  Total problems processed: {total_problems_processed}")
-    print(f"  Problems removed (too trivial): {total_problems_removed}")
-    print(f"  Problems in final dataset: {total_problems_processed - total_problems_removed}")
+    print(f"  Problems removed (trivial/useless): {total_problems_removed}")
+    print(f"  Problems in final dataset: {final_problem_count}")
 
 
 if __name__ == '__main__':
