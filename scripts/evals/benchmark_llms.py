@@ -8,6 +8,7 @@ import json
 import os
 import argparse
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from dotenv import load_dotenv
 
@@ -221,6 +222,40 @@ def calculate_summary_statistics(results, models):
 
     return summary
 
+
+def evaluate_problem(problem, models):
+    problem_result = problem.copy()
+    problem_result["model_outputs"] = {}
+
+    for model_name in models:
+        model_solution_full = get_model_response(model_name, problem["problem_statement"])
+
+        extracted_solution = extract_boxed_content(model_solution_full)
+
+        evaluation = ""
+        score = 0.0
+        final_solution_for_json = ""
+
+        if extracted_solution is not None:
+            final_solution_for_json = extracted_solution
+            evaluation, score = get_judge_evaluation(
+                problem["problem_statement"],
+                problem["ground_truth_solution"],
+                extracted_solution,
+            )
+        else:
+            score = 0.0
+            evaluation = "Evaluation Error: No \\boxed{} expression found in the model's output."
+            final_solution_for_json = model_solution_full
+
+        problem_result["model_outputs"][model_name] = {
+            "solution": final_solution_for_json,
+            "evaluation": evaluation,
+            "score": score,
+        }
+
+    return problem_result
+
 def main():
     parser = argparse.ArgumentParser(description="Benchmark LLMs on physics problems.")
     parser.add_argument(
@@ -247,6 +282,12 @@ def main():
         type=str,
         default=None,  # Set default to None to allow for dynamic generation
         help="File to save the benchmark results. If not provided, it will be generated automatically."
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel workers to evaluate problems",
     )
     args = parser.parse_args()
 
@@ -286,43 +327,10 @@ def main():
     if args.limit:
         all_problems = all_problems[:args.limit]
 
-    for problem in tqdm(all_problems, desc="Evaluating problems"):
-        problem_result = problem.copy()
-        problem_result["model_outputs"] = {}
-
-        for model_name in tqdm(args.model, desc=f"Benchmarking models on {problem['paper_id']}", leave=False):
-            model_solution_full = get_model_response(model_name, problem["problem_statement"])
-            
-            # Extract the boxed part of the model's solution using the robust function
-            extracted_solution = extract_boxed_content(model_solution_full)
-            
-            evaluation = ""
-            score = 0.0
-            final_solution_for_json = ""
-
-            if extracted_solution is not None:
-                final_solution_for_json = extracted_solution
-                
-                # Get evaluation only if a valid solution is found
-                evaluation, score = get_judge_evaluation(
-                    problem["problem_statement"],
-                    problem["ground_truth_solution"],
-                    extracted_solution
-                )
-            else:
-                # If no boxed solution is found, the answer is wrong.
-                score = 0.0
-                evaluation = "Evaluation Error: No \\boxed{} expression found in the model's output."
-                # Store the full response for debugging purposes
-                final_solution_for_json = model_solution_full
-            
-            problem_result["model_outputs"][model_name] = {
-                "solution": final_solution_for_json,
-                "evaluation": evaluation,
-                "score": score,
-            }
-
-        results.append(problem_result)
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        futures = [executor.submit(evaluate_problem, p, args.model) for p in all_problems]
+        for fut in tqdm(as_completed(futures), total=len(futures), desc="Evaluating problems"):
+            results.append(fut.result())
 
     summary = calculate_summary_statistics(results, args.model)
 
