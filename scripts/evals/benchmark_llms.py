@@ -289,6 +289,11 @@ def main():
         default=1,
         help="Number of parallel workers to evaluate problems",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing output file instead of running incrementally."
+    )
     args = parser.parse_args()
 
     # Dynamically set output filename if not provided
@@ -300,7 +305,7 @@ def main():
             output_dir = f"output/results/{model_name}"
             os.makedirs(output_dir, exist_ok=True)
             # Include input file identifier in the output filename
-            args.output_file = f"{output_dir}/benchmark_results_{model_name}_from_{input_basename}.json"
+            args.output_file = f"{output_dir}/benchmark_results_{model_name}.json"
         else:
             # For multiple models, create a generic filename in the root of results
             output_dir = "output/results"
@@ -312,9 +317,19 @@ def main():
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
 
-    papers = load_problems(args.input_file)
-    results = []
+    # --- Load existing results for incremental benchmark ---
+    existing_results = {}
+    if not args.overwrite and os.path.exists(args.output_file):
+        print(f"Loading existing benchmark results from {args.output_file} to run incrementally.")
+        with open(args.output_file, 'r') as f:
+            benchmark_data = json.load(f)
+            # Create a lookup for existing results: (paper_id, problem_statement) -> result
+            for res in benchmark_data.get("results", []):
+                lookup_key = (res["paper_id"], res["problem_statement"])
+                existing_results[lookup_key] = res
 
+    # --- Prepare list of problems to evaluate ---
+    papers = load_problems(args.input_file)
     all_problems = []
     for paper in papers:
         for problem in paper['problems']:
@@ -324,18 +339,58 @@ def main():
                 "ground_truth_solution": problem["final_solution"]
             })
 
+    # --- Filter out problems that have already been evaluated for all specified models ---
+    problems_to_evaluate = []
+    final_results = list(existing_results.values()) # Start with existing results
+    skipped_count = 0
+
+    for problem in all_problems:
+        lookup_key = (problem["paper_id"], problem["problem_statement"])
+        if lookup_key in existing_results:
+            # Check if all current models have been run for this problem
+            existing_models = set(existing_results[lookup_key].get("model_outputs", {}).keys())
+            if set(args.model).issubset(existing_models):
+                skipped_count += 1
+                continue  # Skip if all models are already present
+        
+        problems_to_evaluate.append(problem)
+    
+    if skipped_count > 0:
+        print(f"Skipped {skipped_count} problems that were already evaluated for the specified models.")
+
+    if not problems_to_evaluate:
+        print("No new problems to evaluate for the specified models. Exiting.")
+        return
+
     if args.limit:
-        all_problems = all_problems[:args.limit]
+        problems_to_evaluate = problems_to_evaluate[:args.limit]
+
+    print(f"Found {len(problems_to_evaluate)} new problems to evaluate.")
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        futures = [executor.submit(evaluate_problem, p, args.model) for p in all_problems]
+        futures = [executor.submit(evaluate_problem, p, args.model) for p in problems_to_evaluate]
         for fut in tqdm(as_completed(futures), total=len(futures), desc="Evaluating problems"):
-            results.append(fut.result())
+            new_result = fut.result()
+            # Merge new results with existing ones if necessary
+            lookup_key = (new_result["paper_id"], new_result["problem_statement"])
+            if lookup_key in existing_results:
+                existing_results[lookup_key]["model_outputs"].update(new_result["model_outputs"])
+            else:
+                final_results.append(new_result)
 
-    summary = calculate_summary_statistics(results, args.model)
+    # For any updated entries, we need to refresh them in the final list
+    # This is a bit complex, might be easier to just rebuild the final list
+    final_results_dict = {(r['paper_id'], r['problem_statement']): r for r in final_results}
+    for res in problems_to_evaluate:
+         lookup_key = (res["paper_id"], res["problem_statement"])
+         if lookup_key in final_results_dict: # Should always be true
+            # This part is complex. Let's simplify: just append and deduplicate later.
+            pass # The logic in the ThreadPoolExecutor already handles updating or appending.
+
+    summary = calculate_summary_statistics(final_results, args.model)
 
     final_output = {
-        "results": results,
+        "results": final_results,
         "summary": summary
     }
 

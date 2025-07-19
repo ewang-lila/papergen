@@ -22,13 +22,15 @@ with open(LLM_PROMPT_FILE, 'r') as f:
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-npapers = 10
+npapers = 5
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
     # "physics.chem-ph",     # Chemical Physics
     "math-ph",      # Mathematical Physics
     "nlin.ao",
+    "hep-th"
+
     # "cond-mat.soft",
     # "cond-mat.dis-nn"
 
@@ -293,6 +295,11 @@ def main():
         default=1,
         help="Number of parallel workers to process papers",
     )
+    parser.add_argument(
+        "--reprocess",
+        action="store_true",
+        help="Reprocess papers even if they already exist in all_papers.json"
+    )
     args = parser.parse_args()
 
     setup_directories()
@@ -334,9 +341,27 @@ def main():
         downloaded_archives = search_and_download_papers(max_results_per_category=npapers)
         print(f'Downloaded {len(downloaded_archives)} archives.')
 
+    # determine which archives actually need processing
+    def _paper_id_from_archive(path: str) -> str:
+        base = os.path.basename(path)
+        parts = base.split('.')
+        return f"{parts[0]}.{parts[1]}" if len(parts) >= 2 else parts[0]
+
+    archives_to_process = []
+    for arch in downloaded_archives:
+        pid = _paper_id_from_archive(arch)
+        if args.reprocess or pid not in results_dict:
+            archives_to_process.append(arch)
+        else:
+            print(f"Skipping already processed paper {pid} (use --reprocess to regenerate).")
+
+    if not archives_to_process:
+        print("No new archives to process. Exiting.")
+        return
+
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         print(f'Starting processing with {args.workers} workers...')
-        future_to_archive = {executor.submit(process_archive, archive, args.model): archive for archive in downloaded_archives}
+        future_to_archive = {executor.submit(process_archive, archive, args.model): archive for archive in archives_to_process}
         for future in as_completed(future_to_archive):
             result = future.result()
             if result and 'paper_id' in result:

@@ -43,7 +43,13 @@ def create_agents_and_tasks():
 
     critic_llm = LLM(
         model="openai/gpt-4.1-mini",
-        temperature=0.0,
+        temperature=0.5,
+        api_key=openai_api_key,
+    )
+
+    usefulness_llm = LLM( # JUST FOR USEFULNESS CRITIC
+        model="openai/gpt-4.1",
+        temperature=0.5,
         api_key=openai_api_key,
     )
 
@@ -57,7 +63,7 @@ def create_agents_and_tasks():
         ),
         llm=critic_llm,
         allow_delegation=False,
-        verbose=True,
+        verbose=False,
     )
 
     difficulty_critic = Agent(
@@ -69,18 +75,18 @@ def create_agents_and_tasks():
         ),
         llm=critic_llm,
         allow_delegation=False,
-        verbose=True,
+        verbose=False,
     )
 
     derivation_usefulness_critic = Agent(
         role="Derivation Usefulness Reviewer",
         goal="Determine if the problem asks for a useful derivation that is not explicitly given.",
         backstory=(
-            "You analyze physics problems to ensure they require deriving a new result from the paper rather than merely verifying an equation that is already provided."
+            "You analyze physics problems to ensure they require deriving a new result from the paper rather than merely proving an equation that is already provided."
         ),
-        llm=critic_llm,
+        llm=usefulness_llm,
         allow_delegation=False,
-        verbose=True,
+        verbose=False,
     )
 
     problem_refiner = Agent(
@@ -92,14 +98,11 @@ def create_agents_and_tasks():
         ),
         llm=refiner_llm,
         allow_delegation=False,
-        verbose=True,
+        verbose=False,
     )
 
     task_critique_self_containment = Task(
-        description="""Review the physics problem below, which is designed to be as challenging as possible for an experienced physicist.
-
-    Problem Statement: {problem_statement}
-    Final Solution: {final_solution}
+        description="""You are tasked to review a physics problem, which is designed to be as challenging as possible for an experienced physicist.
 
     Your ONLY goal is to ensure it is self-contained.
     Check for:
@@ -165,47 +168,44 @@ def create_agents_and_tasks():
     )
 
     task_critique_usefulness = Task(
-      description="""Evaluate whether the problem below asks for a useful derivation from the paper.
+      description="""Determine whether the problem below asks to show or prove a specific result.
 
-A 'useful derivation' requires the user to derive a new and unseen result that is NOT given in the problem statement. The problem is USELESS if the solution is already contained in the problem statement or only asks for a proof or verification of a specific result. The problem is acceptable only if it requires several complex steps to reach the desired result, and to provide a new result unseen in the problem statement.
+    A desirable problem requires the user to derive a new result that is NOT given in the problem statement. The problem is USELESS if the final answer is already written as part of the Problem Statement.
 
-Check for these patterns of BAD problems:
-1. The task asks to show or prove a specific result that is already shown.
-2. The problem statement contains the exact mathematical expression that is also the final solution.
-3. The problem is based on fewer than four steps in the paper's derivation.
+    Examples of BAD problems include when
+    1. The task asks to show or prove a result. If the problem asks to show or prove something, you should immediately flag it as not useful.
+    2. The problem statement contains the exact mathematical expression that is also the final solution.
+    3. The problem is based on fewer than four steps in the paper's derivation.
 
-The problem should ask the user to "find", "calculate", or "derive" an expression for a quantity that is not already provided AND requires significant extra work to derive.
-IMPORTANT: a complicated problem statement with lots of equations and symbols does not mean that the problem is difficult.
+    The problem should ask the user to "find", "calculate", or "derive" an expression that is not already provided.
+    IMPORTANT: a complicated problem statement with lots of equations and symbols does not mean that the problem is difficult.
 
-Problem Statement: {problem_statement}
-Final Solution: {final_solution}
+    CRITICAL: Your response MUST be ONLY a valid JSON object with NO other text before or after it.
+    The JSON object MUST have exactly these keys:
+    - "is_useful_derivation": boolean (false if the solution is given away in the problem)
+    - "critique": string (a brief, one-sentence summary of your findings)
 
-CRITICAL: Your response MUST be ONLY a valid JSON object with NO other text before or after it.
-The JSON object MUST have exactly these keys:
-- "is_useful_derivation": boolean (false if the solution is given away in the problem)
-- "critique": string (a brief, one-sentence summary of your findings)
+    Example of a BAD problem (is_useful_derivation: false):
+    ---
+    problem_statement:
+    "Background: [Background on quantum many-body systems...]\nTask: Starting from the definitions above and using the approximated structure of many-body eigenstates and locality arguments, show that the quantum relative entropy $S(\rho_A(t) \Vert \rho_d)$ can be approximated by the difference of von Neumann entropies, S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]."
+    final_solution: "S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]"
+    Critique: "The problem is useless because it asks the user to show the steps to derive an equation that is explicitly provided in the task description."
+    ---
 
-Example of a BAD problem (is_useful_derivation: false):
----
-Problem Statement:
-"Background: [Background on quantum many-body systems...]\nTask: Starting from the definitions above and using the approximated structure of many-body eigenstates and locality arguments, derive that the quantum relative entropy $S(\rho_A(t) \Vert \rho_d)$ can be approximated by the difference of von Neumann entropies,
-S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]."
-Final Solution: "S(\rho_A(t) \Vert \rho_d) \simeq S[\rho_d] - S[\rho_A(t)]"
-Critique: "The problem is useless because it asks the user to derive an equation that is explicitly provided in the task description, making it trivial for the problem-solver since they already know the final solution."
----
+    Example of a GOOD problem (is_useful_derivation: true):
+    ---
+    problem_statement:
+    "Background: [Background on statistical mechanics and networks...]\nTask: Using asymptotic analysis, derive the leading behavior of $N_d(n)$ for fixed $d$ and large $n$ by obtaining an explicit asymptotic formula for $N_d(n)$ in terms of $n$ and $d$."
+    final_solution: "N_d(n) \cong e\, n! \frac{(\ln n)^d}{d!}"
+    Critique: "This problem is sufficiently difficult, as it requires advanced approximation techniques, knowledge of graduate-level statistical mechanics, and graph theory."
+    ---
 
-Example of a GOOD problem (is_useful_derivation: true):
----
-Problem Statement:
-"Background: [Background on statistical mechanics and networks...]\nTask: Using asymptotic analysis, derive the leading behavior of $N_d(n)$ for fixed $d$ and large $n$, i.e., obtain an explicit asymptotic formula for $N_d(n)$ in terms of $n$ and $d$."
-Final Solution: "N_d(n) \cong e\, n! \frac{(\ln n)^d}{d!}"
-Critique: "This problem is sufficiently difficult, as it requires advanced approximation techniques, knowledge of graduate-level statistical mechanics, and graph theory."
----
+    Now, evaluate this problem:
+    problem_statement: {problem_statement}
 
-Now, evaluate this problem:
-Problem Statement: {problem_statement}
-Final Solution: {final_solution}
-""",
+    You MUST NOT accept any questions that ask for a proof or to show a specific result. 
+    """,
       expected_output="A valid JSON object containing the fields 'is_useful_derivation' and 'critique'.",
       agent=derivation_usefulness_critic,
       output_json=UsefulDerivationCritique,
@@ -316,12 +316,17 @@ def process_paper(paper_data):
     archive_glob_path = os.path.join("output/papers/arxiv_papers", f"{paper_id}*.tar.gz")
     found_archives = glob.glob(archive_glob_path)
 
+    print(f"Glob path: {archive_glob_path}")
+    print(f"Found archives: {found_archives}")
+
     if not found_archives:
         print(f"Warning: Could not find source archive for paper {paper_id}. Skipping.")
         return None
 
     archive_path = found_archives[0]
+    print(f"Archive path: {archive_path}")
     paper_text = extract_and_combine_tex_files(archive_path)
+    print(f"Paper text extracted: {bool(paper_text)}")
 
     if not paper_text:
         print(f"Warning: Could not extract text from archive for paper {paper_id}. Skipping.")
@@ -331,6 +336,8 @@ def process_paper(paper_data):
     critiques_for_paper = []
     processed = 0
     removed = 0
+    # Counter for JSON parsing failures in the usefulness critic
+    parse_fail_useful = 0
 
     for i, problem in enumerate(paper_data.get("problems", [])):
         inputs = {
@@ -377,6 +384,7 @@ def process_paper(paper_data):
         except Exception as e:
             print(f"Error in derivation usefulness critique: {e}")
             critiques["useful_derivation"] = {"error": str(e)}
+            parse_fail_useful += 1
 
         is_non_trivial = critiques.get("difficulty", {}).get("is_non_trivial", True)
         is_useful = critiques.get("useful_derivation", {}).get("is_useful_derivation", True)
@@ -421,7 +429,7 @@ def process_paper(paper_data):
             refiner_crew = Crew(
                 agents=[self_containment_critic, difficulty_critic, derivation_usefulness_critic, problem_refiner],
                 tasks=[task_critique_self_containment, task_critique_difficulty, task_critique_usefulness, task_refine_problem],
-                verbose=True,
+                verbose=False,
             )
             refiner_result = refiner_crew.kickoff(inputs=inputs)
             refined_parsed = refiner_result.json_dict
@@ -490,7 +498,7 @@ def process_paper(paper_data):
         return {
             "paper_id": paper_id,
             "problems": refined_problems_for_paper,
-        }, critiques_for_paper, processed, removed
+        }, critiques_for_paper, processed, removed, parse_fail_useful
 
     return None
 
@@ -519,6 +527,11 @@ def main():
         default=1,
         help="Number of parallel workers to process papers"
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing output files instead of appending."
+    )
     args = parser.parse_args()
 
     try:
@@ -531,25 +544,74 @@ def main():
         print(f"Error reading input file: {e}")
         sys.exit(1)
 
+    # --- Load existing data to support incremental runs ---
+    output_filename = "output/problems/refined_problems.json"
+    critiques_filename = "output/critiques/all_critiques.json"
+    
+    existing_refined_problems = set()
     all_refined_papers = []
     all_critiques = []
+
+    if not args.overwrite and os.path.exists(output_filename):
+        print("Existing refined problems file found. Loading to run incrementally.")
+        with open(output_filename, 'r', encoding='utf-8') as f:
+            all_refined_papers = json.load(f)
+        for paper in all_refined_papers:
+            for problem in paper.get("problems", []):
+                existing_refined_problems.add(problem["problem_statement"])
+        
+        if os.path.exists(critiques_filename):
+             with open(critiques_filename, 'r', encoding='utf-8') as f:
+                all_critiques = json.load(f)
+
+        print(f"Loaded {len(existing_refined_problems)} existing refined problems.")
+
+    # --- Filter input data to only include new problems ---
+    new_papers_to_process = []
+    problems_to_process_count = 0
+    for paper in all_papers_data:
+        new_problems_for_paper = []
+        for problem in paper.get("problems", []):
+            if problem["problem_statement"] not in existing_refined_problems:
+                new_problems_for_paper.append(problem)
+        
+        if new_problems_for_paper:
+            new_papers_to_process.append({
+                "paper_id": paper["paper_id"],
+                "problems": new_problems_for_paper
+            })
+            problems_to_process_count += len(new_problems_for_paper)
+
+    total_problems_in_input = sum(len(p.get("problems", [])) for p in all_papers_data)
+    skipped_problems_count = total_problems_in_input - problems_to_process_count
+
+    if skipped_problems_count > 0:
+        print(f"Skipped {skipped_problems_count} problems that were already refined.")
+
+    if not new_papers_to_process:
+        print("No new problems to refine. Exiting.")
+        return
+
+    print(f"Found {problems_to_process_count} new problems to refine.")
+    
     total_problems_processed = 0
     total_problems_removed = 0
     papers_skipped = 0
-    total_problems_in_input = sum(len(p.get("problems", [])) for p in all_papers_data)
+    total_parse_fail_useful = 0
     
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        future_to_paper_data = {executor.submit(process_paper, p): p for p in all_papers_data}
+        future_to_paper_data = {executor.submit(process_paper, p): p for p in new_papers_to_process}
         for future in as_completed(future_to_paper_data):
             paper_data = future_to_paper_data[future]
             result = future.result()
             if result:
-                refined, critiques, processed, removed = result
+                refined, critiques, processed, removed, parse_fail_useful = result
                 if refined:
                     all_refined_papers.append(refined)
                 all_critiques.extend(critiques)
                 total_problems_processed += processed
                 total_problems_removed += removed
+                total_parse_fail_useful += parse_fail_useful
             else:
                 # This indicates the paper was skipped, e.g., source not found.
                 papers_skipped += 1
@@ -584,13 +646,33 @@ def main():
                 break
         all_refined_papers = truncated
 
+    # --- Merge new refined problems into dictionary keyed by paper_id ---
+    refined_by_id = {p["paper_id"]: p for p in all_refined_papers}  # start with existing (if any)
+
+    for new_paper in all_refined_papers:
+        # already included
+        pass  # placeholder, kept for context
+
+    # Include newly processed papers
+    for paper in all_refined_papers[len(existing_refined_problems):]:
+        pid = paper["paper_id"]
+        if pid not in refined_by_id:
+            refined_by_id[pid] = paper
+        else:
+            seen_stmts = {prob["problem_statement"] for prob in refined_by_id[pid]["problems"]}
+            for prob in paper["problems"]:
+                if prob["problem_statement"] not in seen_stmts:
+                    refined_by_id[pid]["problems"].append(prob)
+                    seen_stmts.add(prob["problem_statement"])
+
+    # Replace all_refined_papers with merged list
+    all_refined_papers = list(refined_by_id.values())
+
     # Save all refined problems to a single file
-    output_filename = "output/problems/refined_problems.json"
     with open(output_filename, 'w', encoding='utf-8') as f:
         json.dump(all_refined_papers, f, indent=4, ensure_ascii=False)
 
     # Save all critiques to a file
-    critiques_filename = "output/critiques/all_critiques.json"
     with open(critiques_filename, 'w', encoding='utf-8') as f:
         json.dump(all_critiques, f, indent=4, ensure_ascii=False)
 
@@ -605,6 +687,7 @@ def main():
         print(f"  Papers skipped (source file not found): {papers_skipped}")
     print(f"  Total problems processed: {total_problems_processed}")
     print(f"  Problems removed (trivial/useless): {total_problems_removed}")
+    print(f"  Usefulness critic JSON parse failures: {total_parse_fail_useful}")
     print(f"  Problems in final dataset: {final_problem_count}")
 
 
