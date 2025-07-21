@@ -97,12 +97,12 @@ def build_prompt(problem_statement: str, boxed_answer: str, paper_text: str) -> 
         "Given a very challenging graduate-level physics problem, the final answer, "
         "and the full manuscript from which the problem and solution were derived, you must write a "
         "complete, rigorous, and precise step-by-step derivation that leads unambiguously to the same "
-        "boxed result.\n\n"  # Newlines for readability
+        "boxed result. Note that the problem and solution are completely derived from the paper; no additional information, assumptions, or context is required outside of the paper text.\n\n"  # Newlines for readability
         "OUTPUT FORMAT (CRITICAL): You MUST return ONLY a valid JSON object with exactly "
         "these two keys and no extra keys: \n"
         "  1. \"solution_trace\" - the full step-by-step solution explaining all the work required to reach the final result. Include the final \\boxed result at the end of your step-by-step solution. You MUST NOT reference any material from the paper (e.g., equation (3), reference (2), etc.).\n"
         "  2. \"final_solution\" - the boxed answer, identical to the provided one, e.g. \\boxed{E=mc^2}.\n"
-        "Do not wrap the JSON in markdown fences, and do NOT include any additional commentary."  # Important for parsing
+        "Do not wrap the JSON in markdown fences, and do NOT include any additional commentary. DO NOT MAKE ANY ASSUMPTIONS OR GUESSES, AND DO NOT INTRODUCE ANY OUTSIDE INFORMATION."  # Important for parsing
     )
 
     user_content = (

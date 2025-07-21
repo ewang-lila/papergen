@@ -48,7 +48,7 @@ def create_agents_and_tasks():
     )
 
     usefulness_llm = LLM( # JUST FOR USEFULNESS CRITIC
-        model="openai/gpt-4.1",
+        model="openai/gpt-4.1-mini",
         temperature=0.5,
         api_key=openai_api_key,
     )
@@ -175,7 +175,7 @@ def create_agents_and_tasks():
     Examples of BAD problems include when
     1. The task asks to show or prove a result. If the problem asks to show or prove something, you should immediately flag it as not useful.
     2. The problem statement contains the exact mathematical expression that is also the final solution.
-    3. The problem is based on fewer than four steps in the paper's derivation.
+    3. The problem is based on fewer than four mathematical steps in the paper's derivation. If the problem does not require at least four mathematical steps, it should be discarded.
 
     The problem should ask the user to "find", "calculate", or "derive" an expression that is not already provided.
     IMPORTANT: a complicated problem statement with lots of equations and symbols does not mean that the problem is difficult.
@@ -349,17 +349,18 @@ def process_paper(paper_data):
         critiques = {}
         debug_outputs = {}
 
-        try:
-            sc_crew = Crew(agents=[self_containment_critic], tasks=[task_critique_self_containment], verbose=False)
-            sc_result = sc_crew.kickoff(inputs=inputs)
-            sc_parsed = sc_result.json_dict
-            if sc_parsed:
-                critiques["self_containment"] = sc_parsed
-            else:
-                raise ValueError("Failed to get structured output from self-containment critique")
-        except Exception as e:
-            print(f"Error in self-containment critique: {e}")
-            critiques["self_containment"] = {"error": str(e)}
+        # The self-containment critique is not needed for gating; commenting out to save API calls.
+        # try:
+        #     sc_crew = Crew(agents=[self_containment_critic], tasks=[task_critique_self_containment], verbose=False)
+        #     sc_result = sc_crew.kickoff(inputs=inputs)
+        #     sc_parsed = sc_result.json_dict
+        #     if sc_parsed:
+        #         critiques["self_containment"] = sc_parsed
+        #     else:
+        #         raise ValueError("Failed to get structured output from self-containment critique")
+        # except Exception as e:
+        #     print(f"Error in self-containment critique: {e}")
+        #     critiques["self_containment"] = {"error": str(e)}
 
         try:
             diff_crew = Crew(agents=[difficulty_critic], tasks=[task_critique_difficulty], verbose=False)
