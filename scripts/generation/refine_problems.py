@@ -204,7 +204,7 @@ def create_agents_and_tasks():
     Now, evaluate this problem:
     problem_statement: {problem_statement}
 
-    You MUST NOT accept any questions that ask for a proof or to show a specific result. 
+    Again, you MUST REJECT any question thats ask for a proof or to show a specific result! Be very careful: many problems will include the solution expression in the prompt and ask to show or prove that expression. Any such problem must be rejected!
     """,
       expected_output="A valid JSON object containing the fields 'is_useful_derivation' and 'critique'.",
       agent=derivation_usefulness_critic,
