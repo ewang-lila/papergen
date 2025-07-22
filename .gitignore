@@ -25,11 +25,10 @@ output/*
 output/problems/*
 !output/problems/*.json
 
-# For 'results' directory, track JSONs, TEX, and PDF files recursively
-output/results/*
+# For 'results' directory, track only JSON files recursively
+output/results/**/*
+!output/results/**/
 !output/results/**/*.json
-!output/results/**/*.tex
-!output/results/**/*.pdf
 
 # For 'critiques' and 'papers' directories, ignore all their contents recursively
 output/critiques/**

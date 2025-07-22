@@ -69,6 +69,14 @@ python scripts/evals/export_benchmark_to_tex.py --model <model_name>
 ```
 This script reads `output/results/{model_name}/benchmark_results_{model_name}.json` and generates a LaTeX file at `output/results/{model_name}/tex/solutions_report_{model_name}.tex`. The report is split into multiple subfiles (e.g., `problems_part_1.tex`) in a `output/results/{model_name}/tex/problem_parts/` subdirectory, which are then included in the main report. (We do this because the tex files always have errors for some reason, and LaTeX will fail to compile once a certain ceiling has been hit. This means we can comment out the subfiles if necessary to prevent the compilation error.)
 
+You can also add a --correct-only flag to export only the problems/solutions that the specific model answered correctly.
+
+**Typical usage**:
+```bash
+python scripts/evals/export_benchmark_to_tex.py --model owui-qwen2.5:7b --correct-only
+```
+
+
 ### Step 6: Generate Solution Traces for o3-mini's Correct Solutions
 **Typical usage**: this will export the questions and answers that o3-mini (or another model) solves correctly and exports it to a file in ```output/problems/[model_name]_correct_problems.json```
 ```bash

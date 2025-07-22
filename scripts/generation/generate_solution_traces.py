@@ -15,8 +15,6 @@ from pydantic import BaseModel, ValidationError
 # Configuration
 # -----------------------------------------------------------------------------
 
-INPUT_PROBLEMS_FILE = "output/problems/refined_problems.json"
-OUTPUT_TRACES_FILE = "output/problems/solution_traces.json"
 ARXIV_DOWNLOAD_DIR = "output/papers/arxiv_papers"
 
 MAX_RETRIES = 3  # Number of attempts per problem if validation fails
@@ -190,7 +188,7 @@ def process_problem(openai_client: OpenAI, paper_text: str, problem: Dict[str, s
         try:
             messages = build_prompt(problem_statement, original_boxed, paper_text)
             response = openai_client.chat.completions.create(
-                model="gpt-4.1-mini",  # or your preferred model; must support JSON mode
+                model="gpt-4.1",  # or your preferred model; must support JSON mode
                 messages=messages,
                 response_format={"type": "json_object"}
             )
@@ -227,6 +225,7 @@ def process_paper(openai_client: OpenAI, paper_entry: Dict[str, Any]) -> Optiona
         print("[ERROR] Paper entry missing paper_id – skipping.")
         return None
 
+    print(f"[{paper_id}] Looking for paper archive...")
     archive_pattern = os.path.join(ARXIV_DOWNLOAD_DIR, f"{paper_id}*.tar.gz")
     archives = glob.glob(archive_pattern)
     if not archives:
@@ -239,7 +238,11 @@ def process_paper(openai_client: OpenAI, paper_entry: Dict[str, Any]) -> Optiona
         return None
 
     enriched_problems = []
-    for prob in paper_entry.get("problems", []):
+    problems_to_process = paper_entry.get("problems", [])
+    
+    print(f"[{paper_id}] Found {len(problems_to_process)} problems. Starting processing...")
+    for i, prob in enumerate(problems_to_process):
+        print(f"[{paper_id}] Processing problem {i+1}/{len(problems_to_process)}...")
         enriched = process_problem(openai_client, paper_text, prob)
         if enriched:
             enriched_problems.append(enriched)
@@ -259,9 +262,8 @@ def main():
         return
 
     parser = argparse.ArgumentParser(description="Generate step-by-step solution traces for refined physics problems.")
-    parser.add_argument("--input", default=INPUT_PROBLEMS_FILE, help="Path to refined problems JSON file.")
-    parser.add_argument("--output", default=OUTPUT_TRACES_FILE, help="Destination JSON file for solution traces.")
-    parser.add_argument("--workers", type=int, default=1, help="Number of parallel threads (OpenAI calls).")
+    parser.add_argument("--model", required=True, help="Model name to use for generating traces (e.g., 'o3-mini').")
+    parser.add_argument("--workers", type=int, default=10, help="Number of parallel threads (OpenAI calls).")
     parser.add_argument(
         "--limit",
         type=int,
@@ -270,9 +272,13 @@ def main():
     )
     args = parser.parse_args()
 
+    # Construct file paths based on model name
+    input_file = f"output/problems/{args.model}_correct_problems.json"
+    output_file = f"output/problems/{args.model}_solution_traces.json"
+
     # Load refined problems.
     try:
-        with open(args.input, "r", encoding="utf-8") as fp:
+        with open(input_file, "r", encoding="utf-8") as fp:
             all_papers_data: List[Dict[str, Any]] = json.load(fp)
     except Exception as e:
         print(f"[ERROR] Failed to read input problems file: {e}")
@@ -331,12 +337,12 @@ def main():
                 print(f"[ERROR] Exception while processing paper {pid}: {e}")
 
     # Ensure output directory exists.
-    os.makedirs(os.path.dirname(args.output), exist_ok=True)
-    with open(args.output, "w", encoding="utf-8") as out_fp:
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    with open(output_file, "w", encoding="utf-8") as out_fp:
         json.dump(results, out_fp, indent=4, ensure_ascii=False)
 
     total_traces = sum(len(p["problems"]) for p in results)
-    print(f"\nGenerated {total_traces} solution traces across {len(results)} papers. Saved to {args.output}.")
+    print(f"\nGenerated {total_traces} solution traces across {len(results)} papers. Saved to {output_file}.")
 
 
 if __name__ == "__main__":
