@@ -170,7 +170,7 @@ def generate_problem_parts(results_data, base_tex_dir, num_files=7):
     return problem_files
 
 
-def export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name):
+def export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name, correct_only=False):
     """
     Reads benchmark results and generates a LaTeX report.
     """
@@ -180,7 +180,19 @@ def export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name)
 
     with open(benchmark_results_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    
+ 
+    # Optionally filter to only include problems the specified model answered correctly
+    if correct_only:
+        original_count = len(data.get("results", []))
+        filtered_results = []
+        for prob in data.get("results", []):
+            model_out = prob.get("model_outputs", {}).get(model_name, {})
+            if model_out.get("score") == 1.0:
+                filtered_results.append(prob)
+
+        data["results"] = filtered_results
+        print(f"Filtered problems: {len(filtered_results)} of {original_count} (only correct ones).")
+
     base_tex_dir = os.path.dirname(output_tex_file)
 
     pdf_dir = os.path.join(os.path.dirname(base_tex_dir), "pdf")
@@ -222,16 +234,30 @@ if __name__ == "__main__":
         required=True,
         help="The model name for which to generate the report (e.g., o3-mini, gpt-4o)."
     )
+    parser.add_argument(
+        "--correct-only",
+        action="store_true",
+        help="Include only problems that the specified model answered correctly."
+    )
     args = parser.parse_args()
 
-    model_name = args.model.replace("openai/", "").replace("/", "-")
-    model_results_dir = f"output/results/{model_name}"
+    original_model_name = args.model  # Keep the exact name used in benchmark results
 
-    benchmark_results_file = f"{model_results_dir}/benchmark_results_{model_name}.json"
+    # Sanitise model name for directory/file paths
+    sanitized_model_name = original_model_name.replace("openai/", "").replace("/", "-")
+
+    model_results_dir = f"output/results/{sanitized_model_name}"
+
+    benchmark_results_file = f"{model_results_dir}/benchmark_results_{sanitized_model_name}.json"
     
     tex_dir = os.path.join(model_results_dir, "tex")
     os.makedirs(tex_dir, exist_ok=True)
     
-    output_tex_file = os.path.join(tex_dir, f"solutions_report_{model_name}.tex")
+    output_tex_file = os.path.join(tex_dir, f"solutions_report_{sanitized_model_name}.tex")
 
-    export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name) 
+    export_benchmark_to_tex(
+        benchmark_results_file,
+        output_tex_file,
+        original_model_name,
+        correct_only=args.correct_only,
+    ) 

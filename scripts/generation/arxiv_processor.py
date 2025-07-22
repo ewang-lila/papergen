@@ -1,3 +1,5 @@
+# Added socket for download timeout
+import socket
 import arxiv
 import tarfile
 import os
@@ -10,6 +12,8 @@ import argparse
 import json
 import glob
 import re
+import time
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
@@ -22,7 +26,7 @@ with open(LLM_PROMPT_FILE, 'r') as f:
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
-npapers = 5
+npapers = 1
 
 ARXIV_CATEGORIES = [
     "cond-mat.stat-mech",  # Statistical Mechanics
@@ -52,22 +56,60 @@ def search_and_download_papers(max_results_per_category=5):
     client = arxiv.Client()
     downloaded_files = []
 
+    # Enforce a 15-second timeout for any blocking network read. If a download
+    # stalls longer than this, a socket.timeout is raised so we can skip the
+    # problematic paper instead of hanging the entire run.
+    socket.setdefaulttimeout(15)
+
+    end_date = datetime.now() - timedelta(weeks=10)
+    start_date = datetime.now() - timedelta(weeks=15)
+    
+    # Format dates for the arXiv query
+    start_date_str = start_date.strftime("%Y%m%d")
+    end_date_str = end_date.strftime("%Y%m%d")
+
+    download_counter = 0
+
     for category in ARXIV_CATEGORIES:
         print(f"Searching for papers in category: {category}")
         # Search for recent papers in the specified category
         search = arxiv.Search(
-            query=f"cat:{category}",
+            query=f"cat:{category} AND submittedDate:[{start_date_str} TO {end_date_str}]",
             max_results=max_results_per_category,
-            sort_by=arxiv.SortCriterion.SubmittedDate
+            sort_by=arxiv.SortCriterion.SubmittedDate,
+            sort_order=arxiv.SortOrder.Descending,
         )
 
         for result in client.results(search):
             print(f"Found paper: {result.title} ({result.entry_id})")
+            
+            if result.comment:
+                match = re.search(r'(\d+)\s+pages', result.comment)
+                if match:
+                    try:
+                        pages = int(match.group(1))
+                        if pages > 40:
+                            print(f"Skipping paper due to length ({pages} pages): {result.title}")
+                            continue
+                    except ValueError:
+                        # If parsing fails, proceed to download
+                        pass
+
             try:
                 # Download the source (.tar.gz) file
                 filename = result.download_source(dirpath=DOWNLOAD_DIR)
                 downloaded_files.append(filename)
                 print(f"Downloaded source to: {filename}")
+                download_counter += 1
+
+                if download_counter % 4 == 0:
+                    print("Pausing for 1 second to respect arXiv API rate limits...")
+                    time.sleep(1)
+
+            except socket.timeout:
+                # Skip this paper if the 15-second timeout is hit
+                print(f"Timeout reached while downloading source for {result.entry_id}. Skipping this paper.")
+                continue
             except Exception as e:
                 print(f"Error downloading source for {result.entry_id}: {e}")
     return downloaded_files
@@ -273,7 +315,7 @@ def main():
     parser.add_argument(
         "--npapers",
         type=int,
-        default=5
+        default=2
     )
 
     parser.add_argument(
