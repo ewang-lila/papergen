@@ -17,14 +17,16 @@ python scripts/generation/arxiv_processor.py
 - `--model <model_name>`: Choose the model for problem generation (e.g., `gemini` or `o3`).
 - `--workers <N>`: Process papers in parallel using `N` worker threads.
 
-Example: Process the first 5 local papers using the `gemini` model with 5 workers.
+**Typical usage**: this will generate 2 problems each for 100 papers across four categories using 10 workers.
 ```bash
-python scripts/generation/arxiv_processor.py --no-download --model gemini --limit 5 --workers 5
+python scripts/generation/arxiv_processor.py --npapers 100 --workers 10
 ```
 
 ### Step 2: Consolidate and Filter Raw Outputs
 Next, combine the many individual JSON files into a single, clean master file. This script also filters out low-quality or malformed problems and reports on how many were removed.
 
+
+**Typical usage**:
 ```bash
 python scripts/generation/consolidate_and_filter.py
 ```
@@ -37,9 +39,9 @@ Default:
 ```bash
 python scripts/generation/refine_problems.py
 ```
-Specifying how much input data file to use: 
+**Typical usage**:
 ```bash
-python scripts/generation/refine_problems.py --max-problems 10
+python scripts/generation/refine_problems.py --workers 10
 ```
 
 This will create a JSON file with the critiques at `output/critiques/all_critiques.json` and updated problems at `output/problems/refined_problems.json`.
@@ -47,9 +49,6 @@ This will create a JSON file with the critiques at `output/critiques/all_critiqu
 ### Step 4: Benchmark LLMs
 Evaluate the performance of different LLMs on the set of filtered or refined problems.
 
-```bash
-python scripts/evals/benchmark_llms.py
-```
 This script takes the filtered problems (by default from `output/problems/refined_problems.json`), gets solutions from the specified LLMs, uses a judge model to score them, and saves the detailed results to `output/results/benchmark_results_{model_name}.json` or `output/results/benchmark_results.json`.
 
 **Common Options:**
@@ -57,31 +56,31 @@ This script takes the filtered problems (by default from `output/problems/refine
 *   `--limit`: Limit the number of problems to evaluate for a quick test.
 *   `--input-file`: Specify an alternative input problem file, e.g., `output/problems/all_papers_problems_filtered.json`.
 
-Example: Benchmark `o3` on the first 10 problems using revised problems.
+**Typical usage**: Benchmark `o3-mini` on the full dataset using 10 workers. This will by default skip over problems that have already been evaluated by the model if there is an existing benchmark_results json file.
 ```bash
-python scripts/evals/benchmark_llms.py --models o3 --limit 10 --input-file output/problems/refined_problems.json
+python scripts/evals/benchmark_llms.py --model o3-mini --workers 10
 ```
 
 ### Step 5: Generate a LaTeX Report for Solutions
-Create a high-quality, human-readable report from the benchmark results.
+Generate a latex script that can be used to render the benchmark results and model's solutions.
 
 ```bash
 python scripts/evals/export_benchmark_to_tex.py --model <model_name>
 ```
-This script reads `output/results/{model_name}/benchmark_results_{model_name}.json` and generates a comprehensive LaTeX file at `output/results/{model_name}/tex/solutions_report_{model_name}.tex`. The report is split into multiple subfiles (e.g., `problems_part_1.tex`) in a `output/results/{model_name}/tex/problem_parts/` subdirectory, which are then included in the main report.
+This script reads `output/results/{model_name}/benchmark_results_{model_name}.json` and generates a LaTeX file at `output/results/{model_name}/tex/solutions_report_{model_name}.tex`. The report is split into multiple subfiles (e.g., `problems_part_1.tex`) in a `output/results/{model_name}/tex/problem_parts/` subdirectory, which are then included in the main report. (We do this because the tex files always have errors for some reason, and LaTeX will fail to compile once a certain ceiling has been hit. This means we can comment out the subfiles if necessary to prevent the compilation error.)
 
-You can then compile the main `.tex` file into a PDF using any LaTeX distribution (e.g., `pdflatex`):
+### Step 6: Generate Solution Traces for o3-mini's Correct Solutions
+**Typical usage**: this will export the questions and answers that o3-mini (or another model) solves correctly and exports it to a file in ```output/problems/[model_name]_correct_problems.json```
 ```bash
-pdflatex -output-directory=output/results/{model_name}/pdf output/results/{model_name}/tex/solutions_report_{model_name}.tex
+python scripts/evals/export_correct_problems.py --model o3-mini
 ```
 
-### Step 6: Generate a LaTeX Report for Critiques
-Generate a LaTeX report detailing the critiques from the problem refinement process.
-
+Then, the **default usage:** is to run
 ```bash
-python scripts/evals/export_critiques_to_tex.py
+python scripts/generation/generate_solution_traces.py --input output/problems/o3-mini_correct_problems.json --output output/problems/solution_traces.json
 ```
-This script reads `output/critiques/all_critiques.json` and generates a LaTeX file at `output/critiques/critiques_report.tex`.
+which will  use GPT-4.1 to create solution traces for each question using the question, answer, and paper manuscript. (This will override the existing file though)
+
 
 ## Directory Structure
 
@@ -120,7 +119,7 @@ This script reads `output/critiques/all_critiques.json` and generates a LaTeX fi
 
 1.  **Install dependencies:**
     ```bash
-    pip install -r requirements.txt
+   uv pip install -r requirements.txt
     ```
 
 2.  **Set up API Keys:** Create a `.env` file in the project root and add your API keys:

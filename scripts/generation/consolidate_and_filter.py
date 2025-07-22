@@ -127,16 +127,30 @@ def consolidate_and_filter():
                     for p in all_problems
                 ]
 
-                response = client.embeddings.create(
-                    input=problem_texts,
-                    model="text-embedding-3-small"
-                )
-                embeddings = np.array([item.embedding for item in response.data])
+                # --- Batch processing for embeddings to avoid API limits ---
+                batch_size = 512  # A reasonable batch size to stay under token limits
+                all_embeddings = []
+                print(f"Processing embeddings in batches of {batch_size}...")
+
+                for i in range(0, len(problem_texts), batch_size):
+                    batch = problem_texts[i:i + batch_size]
+                    
+                    num_batches = (len(problem_texts) + batch_size - 1) // batch_size
+                    print(f"  - Processing batch {i//batch_size + 1}/{num_batches}...")
+
+                    response = client.embeddings.create(
+                        input=batch,
+                        model="text-embedding-3-small"
+                    )
+                    all_embeddings.extend([item.embedding for item in response.data])
+                
+                embeddings = np.array(all_embeddings)
+                # --- End of batch processing change ---
                 
                 similarity_matrix = cosine_similarity(embeddings)
                 
                 duplicate_indices = set()
-                similarity_threshold = 0.75
+                similarity_threshold = 0.8
                 print(f"Using similarity threshold: {similarity_threshold}")
                 num_duplicates_found = 0
                 for i in range(len(similarity_matrix)):
