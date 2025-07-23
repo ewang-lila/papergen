@@ -11,6 +11,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
@@ -30,7 +31,8 @@ SUPPORTED_MODELS = [
     "gemini-2.5-pro",
     "gemini-2.5-flash-lite-preview-06-17",
     "owui/qwen3:4b",
-    "owui/qwen3:32b"
+    "owui/qwen3:32b",
+    "owui/qwen2.5:7b",
 ]
 
 JUDGE_MODEL = "gpt-4.1-mini"
@@ -108,15 +110,36 @@ def get_model_response(model_name, problem_statement):
                 "stream": False,
             }
 
-            response = requests.post(
-                f"{OPENWEBUI_API_BASE_URL}/chat/completions",
-                headers=headers,
-                json=payload,
-                verify=False,
-                proxies={ "http": None, "https": None } # Explicitly disable proxies
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+            retries = 3
+            initial_delay = 5
+            backoff_factor = 2
+
+            for attempt in range(retries):
+                try:
+                    response = requests.post(
+                        f"{OPENWEBUI_API_BASE_URL}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        verify=False,
+                        proxies={"http": None, "https": None},  # Explicitly disable proxies
+                        timeout=180,  # 3-minute timeout
+                    )
+                    response.raise_for_status()
+                    return response.json()["choices"][0]["message"]["content"]
+                except requests.exceptions.RequestException as e:
+                    if attempt < retries - 1:
+                        delay = initial_delay * (backoff_factor**attempt)
+                        print(
+                            f"Request for model {model_name} failed with error: {e}. "
+                            f"Retrying in {delay}s... (Attempt {attempt+1}/{retries})"
+                        )
+                        time.sleep(delay)
+                    else:
+                        print(
+                            f"Final attempt failed for model {model_name}. Error: {e}"
+                        )
+                        return f"Error getting response after {retries} attempts: {e}"
+
         elif "claude" in model_name.lower():
             # Anthropic API call
             client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))

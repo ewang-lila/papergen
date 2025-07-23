@@ -55,6 +55,9 @@ def consolidate_and_filter():
         "extraneous_latex_in_problem_statement": 0,
         "solution_contains_prose": 0,
         "duplicate_problem": 0,
+        "prove_statement_in_task": 0,
+        "problem_statement_too_long": 0,
+        "solution_too_long": 0,
     }
 
     for paper_data in all_papers_data:
@@ -64,6 +67,7 @@ def consolidate_and_filter():
         for problem in paper_data.get("problems", []):
             problem_statement = problem.get("problem_statement", "").strip()
             final_solution = problem.get("final_solution", "").strip()
+            task_section = extract_task(problem_statement)
             
             is_valid = True
             reason = ""
@@ -89,6 +93,10 @@ def consolidate_and_filter():
                   len(final_solution.split()) > 100):
                 is_valid = False
                 reason = "solution_contains_prose"
+            # Require at least one whitespace character before 'prove' to avoid matching terms like 'improve'.
+            elif re.search(r"\sprove\s+that\b|\sprove\s+this\b", task_section, re.IGNORECASE):
+                is_valid = False
+                reason = "prove_statement_in_task"
 
             if is_valid:
                 filtered_problems_for_paper.append(problem)
