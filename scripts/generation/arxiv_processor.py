@@ -61,8 +61,8 @@ def search_and_download_papers(max_results_per_category=5):
     # problematic paper instead of hanging the entire run.
     socket.setdefaulttimeout(15)
 
-    end_date = datetime.now() - timedelta(weeks=0)
-    start_date = datetime.now() - timedelta(weeks=25)
+    end_date = datetime.now() - timedelta(weeks=25)
+    start_date = datetime.now() - timedelta(weeks=50)
     
     # Format dates for the arXiv query
     start_date_str = start_date.strftime("%Y%m%d")
@@ -80,38 +80,44 @@ def search_and_download_papers(max_results_per_category=5):
             sort_order=arxiv.SortOrder.Descending,
         )
 
-        for result in client.results(search):
-            print(f"Found paper: {result.title} ({result.entry_id})")
-            
-            if result.comment:
-                match = re.search(r'(\d+)\s+pages', result.comment)
-                if match:
-                    try:
-                        pages = int(match.group(1))
-                        if pages > 40:
-                            print(f"Skipping paper due to length ({pages} pages): {result.title}")
-                            continue
-                    except ValueError:
-                        # If parsing fails, proceed to download
-                        pass
+        try:
+            for result in client.results(search):
+                print(f"Found paper: {result.title} ({result.entry_id})")
+                
+                if result.comment:
+                    match = re.search(r'(\d+)\s+pages', result.comment)
+                    if match:
+                        try:
+                            pages = int(match.group(1))
+                            if pages > 40:
+                                print(f"Skipping paper due to length ({pages} pages): {result.title}")
+                                continue
+                        except ValueError:
+                            # If parsing fails, proceed to download
+                            pass
 
-            try:
-                # Download the source (.tar.gz) file
-                filename = result.download_source(dirpath=DOWNLOAD_DIR)
-                downloaded_files.append(filename)
-                print(f"Downloaded source to: {filename}")
-                download_counter += 1
+                try:
+                    # Download the source (.tar.gz) file
+                    filename = result.download_source(dirpath=DOWNLOAD_DIR)
+                    downloaded_files.append(filename)
+                    print(f"Downloaded source to: {filename}")
+                    download_counter += 1
 
-                if download_counter % 4 == 0:
-                    print("Pausing for 1 second to respect arXiv API rate limits...")
-                    time.sleep(1)
+                    if download_counter % 4 == 0:
+                        print("Pausing for 1 second to respect arXiv API rate limits...")
+                        time.sleep(1)
 
-            except socket.timeout:
-                # Skip this paper if the 15-second timeout is hit
-                print(f"Timeout reached while downloading source for {result.entry_id}. Skipping this paper.")
-                continue
-            except Exception as e:
-                print(f"Error downloading source for {result.entry_id}: {e}")
+                except socket.timeout:
+                    # Skip this paper if the 15-second timeout is hit
+                    print(f"Timeout reached while downloading source for {result.entry_id}. Skipping this paper.")
+                    continue
+                except Exception as e:
+                    print(f"Error downloading source for {result.entry_id}: {e}")
+        except arxiv.UnexpectedEmptyPageError:
+            print(f"Warning: arXiv API returned fewer results than requested for category '{category}'.")
+            print("This can happen if a category has fewer papers than --npapers. Continuing to next category.")
+            continue
+
     return downloaded_files
 
 def extract_and_combine_tex_files(archive_path):
@@ -340,6 +346,12 @@ def main():
     print('Starting main execution...')
     parser = argparse.ArgumentParser(description="Fetch arXiv papers, process them with an LLM, and save the results.")
     parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
+    )
+    parser.add_argument(
         "--no-download",
         action="store_true",
         help="Skip downloading and use existing files in the download directory."
@@ -375,6 +387,10 @@ def main():
         help="Reprocess papers even if they already exist in all_papers.json"
     )
     args = parser.parse_args()
+
+    global DOWNLOAD_DIR, OUTPUT_DIR
+    DOWNLOAD_DIR = os.path.join(args.output_dir, "papers/arxiv_papers")
+    OUTPUT_DIR = os.path.join(args.output_dir, "papers/initial_QA_pairs")
 
     setup_directories()
     print('Directories set up.')

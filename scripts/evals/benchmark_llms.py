@@ -35,7 +35,7 @@ SUPPORTED_MODELS = [
     "owui/qwen2.5:7b",
 ]
 
-JUDGE_MODEL = "gpt-4.1-mini"
+JUDGE_MODEL = "gpt-4.1"
 JUDGE_PROMPT_FILE = os.path.join(os.path.dirname(__file__), "judge_prompt.txt")
 
 MODEL_PROMPT = """You are an expert in physics. You will be given a physics problem. 
@@ -282,6 +282,12 @@ def evaluate_problem(problem, models):
 def main():
     parser = argparse.ArgumentParser(description="Benchmark LLMs on physics problems.")
     parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
+    )
+    parser.add_argument(
         "--model",
         nargs="+",
         default=SUPPORTED_MODELS,
@@ -297,7 +303,7 @@ def main():
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/problems/refined_problems.json",
+        default=None,
         help="Path to the JSON file with problems to benchmark."
     )
     parser.add_argument(
@@ -319,26 +325,29 @@ def main():
     )
     args = parser.parse_args()
 
-    # Dynamically set output filename if not provided
+    # Dynamically set input and output filenames if not provided
+    if args.input_file is None:
+        args.input_file = os.path.join(args.output_dir, "problems/refined_problems.json")
+
     if args.output_file is None:
         input_basename = os.path.splitext(os.path.basename(args.input_file))[0]
         
         if len(args.model) == 1:
             model_name = args.model[0].replace("openai/", "").replace("/", "-")
-            output_dir = f"output/results/{model_name}"
-            os.makedirs(output_dir, exist_ok=True)
+            output_dir_path = os.path.join(args.output_dir, "results", model_name)
+            os.makedirs(output_dir_path, exist_ok=True)
             # Include input file identifier in the output filename
-            args.output_file = f"{output_dir}/benchmark_results_{model_name}.json"
+            args.output_file = os.path.join(output_dir_path, f"benchmark_results_{model_name}.json")
         else:
             # For multiple models, create a generic filename in the root of results
-            output_dir = "output/results"
-            os.makedirs(output_dir, exist_ok=True)
-            args.output_file = f"{output_dir}/benchmark_results_from_{input_basename}.json"
+            output_dir_path = os.path.join(args.output_dir, "results")
+            os.makedirs(output_dir_path, exist_ok=True)
+            args.output_file = os.path.join(output_dir_path, f"benchmark_results_from_{input_basename}.json")
     else:
         # If an output file is specified, ensure its directory exists
-        output_dir = os.path.dirname(args.output_file)
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
+        output_dir_path = os.path.dirname(args.output_file)
+        if output_dir_path:
+            os.makedirs(output_dir_path, exist_ok=True)
 
     # --- Load existing results for incremental benchmark ---
     existing_results = {}

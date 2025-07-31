@@ -42,7 +42,13 @@ def load_benchmark(path: str) -> List[Dict[str, Any]]:
 
 
 def collect_correct_problems(results: List[Dict[str, Any]], model_key: str) -> List[Dict[str, Any]]:
-    """Return problems where model_key scored 1."""
+    """Return problems where the given model scored perfectly (1.0) **or** half-credit (0.5).
+
+    The benchmark currently assigns scores of 0, 0.5, or 1. A score ≥ 0.5 is
+    deemed "acceptable" for the purposes of generating solution traces, so we
+    include both 0.5 and 1.0 here.  The numeric comparison is tolerant to small
+    floating-point error (~1e-6).
+    """
     papers: Dict[str, List[Dict[str, str]]] = defaultdict(list)
 
     for entry in results:
@@ -50,14 +56,20 @@ def collect_correct_problems(results: List[Dict[str, Any]], model_key: str) -> L
         if not paper_id:
             continue
 
-        # Extract score
-        score = (
+        # Extract score (may be str or number)
+        raw_score = (
             entry.get("model_outputs", {})
             .get(model_key, {})
             .get("score")
         )
-        # Accept scores that equal 1 within floating error
-        if score is None or abs(float(score) - 1.0) > 1e-6:
+
+        try:
+            score_val = float(raw_score)
+        except (TypeError, ValueError):
+            continue  # Skip entries with missing or non-numeric scores
+
+        # Accept scores >= 0.5 (tolerant to tiny FP error)
+        if score_val < 0.5:
             continue
 
         papers[paper_id].append(
@@ -85,6 +97,7 @@ def main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--model", required=True, help="Model key to inspect (e.g., 'o3-mini').")
+    parser.add_argument("--output-dir", type=str, default="output", help="The base directory for all output files.")
     parser.add_argument("--benchmark", help="Path to benchmark_results JSON file. If not provided, it will be inferred from the model name.")
     parser.add_argument("--output", help="Destination JSON file for extracted problems. If not provided, it will be inferred from the model name.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite the output file if it exists, instead of appending.")
@@ -93,10 +106,10 @@ def main() -> None:
     
     # Infer paths if not provided
     if not args.benchmark:
-        args.benchmark = f"output/results/{args.model}/benchmark_results_{args.model}.json"
+        args.benchmark = os.path.join(args.output_dir, f"results/{args.model}/benchmark_results_{args.model}.json")
     
     if not args.output:
-        args.output = f"output/problems/{args.model}_correct_problems.json"
+        args.output = os.path.join(args.output_dir, f"problems/{args.model}_correct_problems.json")
 
     try:
         results = load_benchmark(args.benchmark)
