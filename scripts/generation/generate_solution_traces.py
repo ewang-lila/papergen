@@ -218,7 +218,7 @@ def process_problem(openai_client: OpenAI, paper_text: str, problem: Dict[str, s
     return None
 
 
-def process_paper(openai_client: OpenAI, paper_entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def process_paper(openai_client: OpenAI, paper_entry: Dict[str, Any], output_dir: str) -> Optional[Dict[str, Any]]:
     """Process all problems for a single paper and return enriched data."""
     paper_id = paper_entry.get("paper_id")
     if not paper_id:
@@ -226,7 +226,7 @@ def process_paper(openai_client: OpenAI, paper_entry: Dict[str, Any]) -> Optiona
         return None
 
     print(f"[{paper_id}] Looking for paper archive...")
-    archive_pattern = os.path.join(ARXIV_DOWNLOAD_DIR, f"{paper_id}*.tar.gz")
+    archive_pattern = os.path.join(output_dir, "papers/arxiv_papers", f"{paper_id}*.tar.gz")
     archives = glob.glob(archive_pattern)
     if not archives:
         print(f"[WARN] No archive found for paper {paper_id}. Skipping problems from this paper.")
@@ -263,7 +263,17 @@ def main():
 
     parser = argparse.ArgumentParser(description="Generate step-by-step solution traces for refined physics problems.")
     parser.add_argument("--model", required=True, help="Model name to use for generating traces (e.g., 'o3-mini').")
+    parser.add_argument("--output-dir", type=str, default="output", help="The base directory for all output files.")
     parser.add_argument("--workers", type=int, default=10, help="Number of parallel threads (OpenAI calls).")
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help=(
+            "If set, always regenerate traces and overwrite any existing output file. "
+            "If omitted, the script will load existing traces (if present) and only generate "
+            "solutions for new problems, then append them to the file."
+        ),
+    )
     parser.add_argument(
         "--limit",
         type=int,
@@ -273,8 +283,8 @@ def main():
     args = parser.parse_args()
 
     # Construct file paths based on model name
-    input_file = f"output/problems/{args.model}_correct_problems.json"
-    output_file = f"output/problems/{args.model}_solution_traces.json"
+    input_file = os.path.join(args.output_dir, f"problems/{args.model}_correct_problems.json")
+    output_file = os.path.join(args.output_dir, f"problems/{args.model}_solution_traces.json")
 
     # Load refined problems.
     try:
@@ -284,15 +294,75 @@ def main():
         print(f"[ERROR] Failed to read input problems file: {e}")
         return
 
+    # ------------------------------------------------------------------
+    # Load existing traces (when not overwriting) so we can skip problems
+    # that have already been processed.
+    # ------------------------------------------------------------------
+
+    existing_output_data: List[Dict[str, Any]] = []
+    existing_traces_map: Dict[str, Dict[str, Any]] = {}
+
+    if not args.overwrite and os.path.exists(output_file):
+        try:
+            with open(output_file, "r", encoding="utf-8") as fp:
+                existing_output_data = json.load(fp)
+
+            # Build quick-lookup map: paper_id -> {problem_statement: problem_dict}
+            for paper in existing_output_data:
+                pid = paper.get("paper_id")
+                if not pid:
+                    continue
+                existing_traces_map[pid] = {
+                    prob.get("problem_statement", ""): prob
+                    for prob in paper.get("problems", [])
+                    if prob.get("problem_statement")
+                }
+            print(
+                f"Loaded existing traces for {len(existing_traces_map)} papers – "
+                "will skip already-processed problems. Use --overwrite to regenerate."
+            )
+        except Exception as e:
+            print(f"[WARN] Failed to load existing traces: {e}. Proceeding without them.")
+            existing_output_data = []
+            existing_traces_map = {}
+
     # Apply problem limit if specified
-    papers_to_process = all_papers_data
+    papers_to_process: List[Dict[str, Any]] = []
+
+    for paper in all_papers_data:
+        pid = paper.get("paper_id")
+        if not pid:
+            continue
+
+        problems_in_paper = paper.get("problems", [])
+        if not problems_in_paper:
+            continue
+
+        if args.overwrite or pid not in existing_traces_map:
+            # Either overwriting everything, or this paper has no existing traces.
+            papers_to_process.append(paper)
+            continue
+
+        # Filter out problems that already have traces.
+        already_traced = existing_traces_map[pid]
+        new_problems = [
+            prob for prob in problems_in_paper
+            if prob.get("problem_statement", "") not in already_traced
+        ]
+
+        if new_problems:
+            paper_copy = paper.copy()
+            paper_copy["problems"] = new_problems
+            papers_to_process.append(paper_copy)
+
+    # If --limit is used, enforce it *after* skipping existing traces so we only
+    # count problems that will actually be processed by the LLM.
     if args.limit and args.limit > 0:
         print(f"Limiting processing to the first {args.limit} problems.")
-        
-        limited_papers = []
+        limited_papers: List[Dict[str, Any]] = []
         problems_count = 0
-        
-        for paper in all_papers_data:
+
+        for paper in papers_to_process:
             if problems_count >= args.limit:
                 break
 
@@ -301,27 +371,26 @@ def main():
                 continue
 
             num_to_take = args.limit - problems_count
-            
+
             if len(problems_in_paper) <= num_to_take:
-                # Take all problems from this paper
                 limited_papers.append(paper)
                 problems_count += len(problems_in_paper)
             else:
-                # Take a subset of problems from this paper
-                limited_paper_copy = paper.copy()
-                limited_paper_copy["problems"] = problems_in_paper[:num_to_take]
-                limited_papers.append(limited_paper_copy)
+                paper_copy = paper.copy()
+                paper_copy["problems"] = problems_in_paper[:num_to_take]
+                limited_papers.append(paper_copy)
                 problems_count += num_to_take
-        
+
         papers_to_process = limited_papers
 
     openai_client = OpenAI()
 
-    results: List[Dict[str, Any]] = []
+    # Start with existing traces if we are appending; otherwise start fresh.
+    results: List[Dict[str, Any]] = [] if args.overwrite else existing_output_data.copy()
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_to_pid = {
-            executor.submit(process_paper, openai_client, paper): paper.get("paper_id")
+            executor.submit(process_paper, openai_client, paper, args.output_dir): paper.get("paper_id")
             for paper in papers_to_process
         }
         for fut in as_completed(future_to_pid):
@@ -329,7 +398,24 @@ def main():
             try:
                 paper_result = fut.result()
                 if paper_result:
-                    results.append(paper_result)
+                    # Merge with existing results if the paper is already present.
+                    existing_idx = next(
+                        (i for i, p in enumerate(results) if p.get("paper_id") == pid),
+                        None,
+                    )
+                    if existing_idx is not None:
+                        # Extend problems list without duplicates.
+                        existing_problem_statements = {
+                            prob.get("problem_statement", "")
+                            for prob in results[existing_idx].get("problems", [])
+                        }
+                        new_unique_problems = [
+                            prob for prob in paper_result["problems"]
+                            if prob.get("problem_statement", "") not in existing_problem_statements
+                        ]
+                        results[existing_idx]["problems"].extend(new_unique_problems)
+                    else:
+                        results.append(paper_result)
                     print(f"[DONE] Processed paper {pid} – {len(paper_result['problems'])} traces.")
                 else:
                     print(f"[SKIP] No traces generated for {pid}.")
@@ -339,10 +425,13 @@ def main():
     # Ensure output directory exists.
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as out_fp:
-        json.dump(results, out_fp, indent=4, ensure_ascii=False)
+         json.dump(results, out_fp, indent=4, ensure_ascii=False)
 
     total_traces = sum(len(p["problems"]) for p in results)
-    print(f"\nGenerated {total_traces} solution traces across {len(results)} papers. Saved to {output_file}.")
+    print(
+        f"\nGenerated {total_traces} solution traces across {len(results)} papers. "
+        f"Saved to {output_file}."
+    )
 
 
 if __name__ == "__main__":

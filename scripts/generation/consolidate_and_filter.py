@@ -6,14 +6,15 @@ import numpy as np
 from openai import OpenAI
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
+import argparse
 
-RAW_OUTPUT_DIR = "output/papers/initial_QA_pairs"
-FILTERED_OUTPUT_FILENAME = "output/problems/all_papers_problems_filtered.json"
-
-def consolidate_and_filter():
+def consolidate_and_filter(output_dir):
     """
     Consolidates raw JSON outputs and filters them based on quality rules.
     """
+    RAW_OUTPUT_DIR = os.path.join(output_dir, "papers/initial_QA_pairs")
+    FILTERED_OUTPUT_FILENAME = os.path.join(output_dir, "problems/all_papers_problems_filtered.json")
+
     def extract_task(statement):
         """Extracts the 'Task' section from a problem statement."""
         match = re.search(r'Task:(.*)', statement, re.DOTALL | re.IGNORECASE)
@@ -229,4 +230,12 @@ def consolidate_and_filter():
     print(f"\nFiltered data saved to '{FILTERED_OUTPUT_FILENAME}'.")
 
 if __name__ == "__main__":
-    consolidate_and_filter() 
+    parser = argparse.ArgumentParser(description="Consolidate and filter raw problem data.")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
+    )
+    args = parser.parse_args()
+    consolidate_and_filter(args.output_dir) 

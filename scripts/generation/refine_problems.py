@@ -124,8 +124,8 @@ def create_agents_and_tasks():
 
   Problem:
   ---
-  Problem Statement: {problem_statement}
-  Solution: {final_solution}
+  Problem Statement: "{problem_statement}"
+  Solution: "{final_solution}"
   ---
 
   Paper text for reference:
@@ -180,11 +180,10 @@ def create_agents_and_tasks():
 
     Problem:
     ---
-    problem_statement: {problem_statement}
-    
+    problem_statement: "{problem_statement}"
     End problem statement. Below is the Final Solution. Check to make sure the expression shown below is not explicitly included in the above problem_statement:
     ---
-    final_solution: {final_solution}
+    final_solution: "{final_solution}"
     ---
   """,
       expected_output="A valid JSON object containing the fields 'is_non_trivial' and 'critique'.",
@@ -227,7 +226,7 @@ def create_agents_and_tasks():
     ---
 
     Now, evaluate this problem:
-    problem_statement: {problem_statement}
+    problem_statement: "{problem_statement}"
 
     Again, you MUST REJECT any question thats ask for a proof or to show a specific result! Be very careful: many problems will include the solution expression in the prompt and ask to show or prove that expression. Any such problem must be rejected!
     """,
@@ -257,8 +256,10 @@ def create_agents_and_tasks():
   }
   Now, here is the original problem:
   ---
-  problem_statement: {problem_statement}
-  final_solution: {final_solution}
+  problem_statement: "{problem_statement}"
+  ---
+  and here is the final solution:
+  final_solution: "{final_solution}"
   ---
 
   Review the critiques that follow and revise the problem if necessary. Do not make any changes if no issues are raised. Make sure all LaTeX is wrapped in $$. Do not use any special characters or unicode characters in your response; replace any of these characters in the original problem-solution with proper LaTeX!
@@ -326,7 +327,7 @@ def extract_and_combine_tex_files(archive_path):
         
     return None
 
-def process_paper(paper_data):
+def process_paper(paper_data, output_dir, agents_and_tasks, no_debug=False):
     (
         self_containment_critic,
         difficulty_critic,
@@ -336,9 +337,9 @@ def process_paper(paper_data):
         task_critique_difficulty,
         task_critique_usefulness,
         task_refine_problem,
-    ) = create_agents_and_tasks()
+    ) = agents_and_tasks
     paper_id = paper_data["paper_id"]
-    archive_glob_path = os.path.join("output/papers/arxiv_papers", f"{paper_id}*.tar.gz")
+    archive_glob_path = os.path.join(output_dir, "papers/arxiv_papers", f"{paper_id}*.tar.gz")
     found_archives = glob.glob(archive_glob_path)
 
     print(f"Glob path: {archive_glob_path}")
@@ -507,21 +508,22 @@ def process_paper(paper_data):
             }
             critiques_for_paper.append(critique_entry)
 
-        debug_filename = f"output/critiques/debug/{paper_id}_problem_{i}_debug.json"
-        with open(debug_filename, "w", encoding="utf-8") as f:
-            json.dump({
-                "paper_id": paper_id,
-                "problem_index": i,
-                "problem_statement": problem["problem_statement"],
-                "final_solution": problem["final_solution"],
-                "debug_outputs": debug_outputs,
-                "critiques_parsed": critiques,
-            }, f, indent=2, ensure_ascii=False)
+        if not no_debug:
+            debug_filename = os.path.join(output_dir, "critiques/debug", f"{paper_id}_problem_{i}_debug.json")
+            with open(debug_filename, "w", encoding="utf-8") as f:
+                json.dump({
+                    "paper_id": paper_id,
+                    "problem_index": i,
+                    "problem_statement": problem["problem_statement"],
+                    "final_solution": problem["final_solution"],
+                    "debug_outputs": debug_outputs,
+                    "critiques_parsed": critiques,
+                }, f, indent=2, ensure_ascii=False)
 
         processed += 1
 
     # === Persist critiques for this paper immediately ===
-    paper_critiques_path = os.path.join("output", "critiques", f"{paper_id}_critiques.json")
+    paper_critiques_path = os.path.join(output_dir, "critiques", f"{paper_id}_critiques.json")
     try:
         with open(paper_critiques_path, "w", encoding="utf-8") as f:
             json.dump(critiques_for_paper, f, indent=2, ensure_ascii=False)
@@ -545,14 +547,17 @@ def process_paper(paper_data):
 # --- Main Execution ---
 
 def main():
-    os.makedirs("output/critiques", exist_ok=True)
-    os.makedirs("output/critiques/debug", exist_ok=True)
-    
     parser = argparse.ArgumentParser(description="Refine problems from a consolidated JSON file.")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
+    )
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/problems/all_papers_problems_filtered.json",
+        default=None,
         help="Path to the consolidated JSON file with problems to refine."
     )
     parser.add_argument(
@@ -572,21 +577,35 @@ def main():
         action="store_true",
         help="Overwrite existing output files instead of appending."
     )
+    parser.add_argument(
+        "--no-debug",
+        action="store_true",
+        help="Do not write per-problem debug JSON files."
+    )
+
     args = parser.parse_args()
 
+    os.makedirs(os.path.join(args.output_dir, "critiques"), exist_ok=True)
+    os.makedirs(os.path.join(args.output_dir, "critiques/debug"), exist_ok=True)
+    
+    input_file = args.input_file
+    if input_file is None:
+        input_file = os.path.join(args.output_dir, "problems/all_papers_problems_filtered.json")
+
+
     try:
-        with open(args.input_file, 'r', encoding='utf-8') as f:
+        with open(input_file, 'r', encoding='utf-8') as f:
             all_papers_data = json.load(f)
     except FileNotFoundError:
-        print(f"Error: Input file not found at {args.input_file}")
+        print(f"Error: Input file not found at {input_file}")
         sys.exit(1)
     except Exception as e:
         print(f"Error reading input file: {e}")
         sys.exit(1)
 
     # --- Load existing data to support incremental runs ---
-    output_filename = "output/problems/refined_problems.json"
-    critiques_filename = "output/critiques/all_critiques.json"
+    output_filename = os.path.join(args.output_dir, "problems/refined_problems.json")
+    critiques_filename = os.path.join(args.output_dir, "critiques/all_critiques.json")
     
     existing_refined_problems = set()
     all_refined_papers = []
@@ -639,8 +658,9 @@ def main():
     papers_skipped = 0
     total_parse_fail_useful = 0
     
+    agents_and_tasks = create_agents_and_tasks()
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        future_to_paper_data = {executor.submit(process_paper, p): p for p in new_papers_to_process}
+        future_to_paper_data = {executor.submit(process_paper, p, args.output_dir, agents_and_tasks, args.no_debug): p for p in new_papers_to_process}
         for future in as_completed(future_to_paper_data):
             paper_data = future_to_paper_data[future]
             result = future.result()
