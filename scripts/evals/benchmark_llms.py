@@ -11,6 +11,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
@@ -30,10 +31,11 @@ SUPPORTED_MODELS = [
     "gemini-2.5-pro",
     "gemini-2.5-flash-lite-preview-06-17",
     "owui/qwen3:4b",
-    "owui/qwen3:32b"
+    "owui/qwen3:32b",
+    "owui/qwen2.5:7b",
 ]
 
-JUDGE_MODEL = "gpt-4.1-mini"
+JUDGE_MODEL = "gpt-4.1"
 JUDGE_PROMPT_FILE = os.path.join(os.path.dirname(__file__), "judge_prompt.txt")
 
 MODEL_PROMPT = """You are an expert in physics. You will be given a physics problem. 
@@ -108,15 +110,36 @@ def get_model_response(model_name, problem_statement):
                 "stream": False,
             }
 
-            response = requests.post(
-                f"{OPENWEBUI_API_BASE_URL}/chat/completions",
-                headers=headers,
-                json=payload,
-                verify=False,
-                proxies={ "http": None, "https": None } # Explicitly disable proxies
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+            retries = 3
+            initial_delay = 5
+            backoff_factor = 2
+
+            for attempt in range(retries):
+                try:
+                    response = requests.post(
+                        f"{OPENWEBUI_API_BASE_URL}/chat/completions",
+                        headers=headers,
+                        json=payload,
+                        verify=False,
+                        proxies={"http": None, "https": None},  # Explicitly disable proxies
+                        timeout=180,  # 3-minute timeout
+                    )
+                    response.raise_for_status()
+                    return response.json()["choices"][0]["message"]["content"]
+                except requests.exceptions.RequestException as e:
+                    if attempt < retries - 1:
+                        delay = initial_delay * (backoff_factor**attempt)
+                        print(
+                            f"Request for model {model_name} failed with error: {e}. "
+                            f"Retrying in {delay}s... (Attempt {attempt+1}/{retries})"
+                        )
+                        time.sleep(delay)
+                    else:
+                        print(
+                            f"Final attempt failed for model {model_name}. Error: {e}"
+                        )
+                        return f"Error getting response after {retries} attempts: {e}"
+
         elif "claude" in model_name.lower():
             # Anthropic API call
             client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -259,6 +282,12 @@ def evaluate_problem(problem, models):
 def main():
     parser = argparse.ArgumentParser(description="Benchmark LLMs on physics problems.")
     parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
+    )
+    parser.add_argument(
         "--model",
         nargs="+",
         default=SUPPORTED_MODELS,
@@ -274,7 +303,7 @@ def main():
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/problems/refined_problems.json",
+        default=None,
         help="Path to the JSON file with problems to benchmark."
     )
     parser.add_argument(
@@ -296,26 +325,29 @@ def main():
     )
     args = parser.parse_args()
 
-    # Dynamically set output filename if not provided
+    # Dynamically set input and output filenames if not provided
+    if args.input_file is None:
+        args.input_file = os.path.join(args.output_dir, "problems/refined_problems.json")
+
     if args.output_file is None:
         input_basename = os.path.splitext(os.path.basename(args.input_file))[0]
         
         if len(args.model) == 1:
             model_name = args.model[0].replace("openai/", "").replace("/", "-")
-            output_dir = f"output/results/{model_name}"
-            os.makedirs(output_dir, exist_ok=True)
+            output_dir_path = os.path.join(args.output_dir, "results", model_name)
+            os.makedirs(output_dir_path, exist_ok=True)
             # Include input file identifier in the output filename
-            args.output_file = f"{output_dir}/benchmark_results_{model_name}.json"
+            args.output_file = os.path.join(output_dir_path, f"benchmark_results_{model_name}.json")
         else:
             # For multiple models, create a generic filename in the root of results
-            output_dir = "output/results"
-            os.makedirs(output_dir, exist_ok=True)
-            args.output_file = f"{output_dir}/benchmark_results_from_{input_basename}.json"
+            output_dir_path = os.path.join(args.output_dir, "results")
+            os.makedirs(output_dir_path, exist_ok=True)
+            args.output_file = os.path.join(output_dir_path, f"benchmark_results_from_{input_basename}.json")
     else:
         # If an output file is specified, ensure its directory exists
-        output_dir = os.path.dirname(args.output_file)
-        if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
+        output_dir_path = os.path.dirname(args.output_file)
+        if output_dir_path:
+            os.makedirs(output_dir_path, exist_ok=True)
 
     # --- Load existing results for incremental benchmark ---
     existing_results = {}

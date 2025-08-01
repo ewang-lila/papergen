@@ -6,14 +6,15 @@ import numpy as np
 from openai import OpenAI
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
+import argparse
 
-RAW_OUTPUT_DIR = "output/papers/initial_QA_pairs"
-FILTERED_OUTPUT_FILENAME = "output/problems/all_papers_problems_filtered.json"
-
-def consolidate_and_filter():
+def consolidate_and_filter(output_dir):
     """
     Consolidates raw JSON outputs and filters them based on quality rules.
     """
+    RAW_OUTPUT_DIR = os.path.join(output_dir, "papers/initial_QA_pairs")
+    FILTERED_OUTPUT_FILENAME = os.path.join(output_dir, "problems/all_papers_problems_filtered.json")
+
     def extract_task(statement):
         """Extracts the 'Task' section from a problem statement."""
         match = re.search(r'Task:(.*)', statement, re.DOTALL | re.IGNORECASE)
@@ -55,6 +56,9 @@ def consolidate_and_filter():
         "extraneous_latex_in_problem_statement": 0,
         "solution_contains_prose": 0,
         "duplicate_problem": 0,
+        "prove_statement_in_task": 0,
+        "problem_statement_too_long": 0,
+        "solution_too_long": 0,
     }
 
     for paper_data in all_papers_data:
@@ -64,6 +68,7 @@ def consolidate_and_filter():
         for problem in paper_data.get("problems", []):
             problem_statement = problem.get("problem_statement", "").strip()
             final_solution = problem.get("final_solution", "").strip()
+            task_section = extract_task(problem_statement)
             
             is_valid = True
             reason = ""
@@ -89,6 +94,10 @@ def consolidate_and_filter():
                   len(final_solution.split()) > 100):
                 is_valid = False
                 reason = "solution_contains_prose"
+            # Require at least one whitespace character before 'prove' to avoid matching terms like 'improve'.
+            elif re.search(r"\sprove\s+that\b|\sprove\s+this\b", task_section, re.IGNORECASE):
+                is_valid = False
+                reason = "prove_statement_in_task"
 
             if is_valid:
                 filtered_problems_for_paper.append(problem)
@@ -221,4 +230,12 @@ def consolidate_and_filter():
     print(f"\nFiltered data saved to '{FILTERED_OUTPUT_FILENAME}'.")
 
 if __name__ == "__main__":
-    consolidate_and_filter() 
+    parser = argparse.ArgumentParser(description="Consolidate and filter raw problem data.")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
+    )
+    args = parser.parse_args()
+    consolidate_and_filter(args.output_dir) 

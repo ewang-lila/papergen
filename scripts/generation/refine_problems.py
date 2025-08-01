@@ -124,8 +124,8 @@ def create_agents_and_tasks():
 
   Problem:
   ---
-  Problem Statement: {problem_statement}
-  Solution: {final_solution}
+  Problem Statement: "{problem_statement}"
+  Solution: "{final_solution}"
   ---
 
   Paper text for reference:
@@ -137,30 +137,54 @@ def create_agents_and_tasks():
     )
 
     task_critique_difficulty = Task(
-      description="""Review the physics problem below, which is designed to be as challenging as possible for a PhD student in physics.
-  Your ONLY goal is to ensure the problem is sufficiently difficult, requiring a sophisticated chain of reasoning.
-  It should NOT be a simple lookup of a fact, a direct restatement of an equation or model most physics PhD students would know, or a straightforward application of a well-known technique or result.
-  The problem should require synthesizing multiple concepts or equations.
-  *Note:* the problem is intended to be a sophisticated retracing of the paper's reasoning, for example, by going from equation 1 to equation 5 in the paper.
-  The problem will be presented independently of the paper, so it is acceptable (and expected) for the question to require rederivations of complex equations or terms shown in the paper.
+      description="""Review the physics problem and solution below, which is designed to be as challenging as possible for a PhD student in physics.
+    Your ONLY goal is to ensure the problem statement is sufficiently difficult, requiring a sophisticated chain of reasoning, and does not state the final_solution in the problem_statement.
+    It should NOT be a simple lookup of a fact, a direct restatement of an equation or model most physics PhD students would know, or a straightforward application of a well-known technique or result.
+    The problem should require synthesizing multiple concepts or equations.
+    *Note:* the problem is intended to be a sophisticated retracing of the paper's reasoning, for example, by going from equation 1 to equation 5 in the paper.
+    The problem will be presented independently of the paper, so it is acceptable (and expected) for the question to require rederivations of complex equations or terms shown in the paper, as long as the desired rederivation is not shown in the problem statement.
 
-  CRITICAL: Your response MUST be ONLY a valid JSON object with NO other text before or after it.
-  The JSON object MUST have exactly these keys:
-  - "is_non_trivial": boolean
-  - "critique": string (a brief, one-sentence summary of your findings)
+    **CRITICAL: Reject if the explicit final form or final expression of the final_solution, which is shown in the final_solution object at the end of this prompt, appears inside the problem_statement.
+    - This includes any case where the full expression in the final_solution is provided in the problem_statement. Phrases like “derive an expression for the partition function and express the result as: [final_solution]” in the problem_statement should be flagged.
+    - Do NOT accept problems that ask to derive, rederive, prove, or show an equation that is already presented to the student in the problem_statement.
+    - Sophisticated notation and multi-step derivations do NOT make a problem difficulty if the answer is already given.
 
-  IMPORTANT: If the problem is not sufficiently difficult, "is_non_trivial" must be false.
+    Here are some examples:
+    BAD Example 1:
+    ---
+    problem_statement: "Background: Consider the entanglement entropy $S = -Tr(\rho \log \rho)$ for a 1D critical system. [Additional background...] Task: Using replica trick and conformal field theory, find the entropy $S$ for a subsystem of length $\ell$, ensuring that it follows the form $S = c/3 \log(\ell/\epsilon) + c_1$."
+    final_solution: "$S = c/3 \log(\ell/\epsilon) + c_1$"
+    ---
+    Output: {"is_non_trivial": false, "critique": "The answer is already stated explicitly in the task, making the problem trivial."}
 
-  Example of correct output:
-  {"is_non_trivial": false, "critique": "The problem asks for an alternate form of a equation covered in most graduate quantum field theory courses."}
-  {"is_non_trivial": true, "critique": "The question requires detailed knowledge of statistical mechanics and field theory, as well as the application of the Laplace transform to derive an approximate analytical solution."}
+    BAD Example 2:
+    ---
+    problem_statement: "Background: In $SU(N)$ Wess-Zumino-Witten theory at level $k$, consider the partition function on a torus. The torus partition function is often given as a sequence of level-k theta functions, $Z^k(\tau) = \det(w) \theta \lambda^k(q) \theta \lambda^n-\theta^n (\lambda)$ [Additional background...] Task: By Poisson resummation, rederive the explicit formula for the torus partition function as a sum over theta functions \theta_n=2q^2\pi”
+    final_solution: "$Z^k(\tau) = \det(w) \theta_n \lambda^k(q) \theta_n \lambda^n-\theta_n^n (\lambda)$"
+    ---
+    Output: {"is_non_trivial": false, "critique": "The problem simply asks for a derivation of a formula already presented in the problem statement."}
+    
+    GOOD Example:
+    ---
+    problem_statement: "Background: Consider a gas of weakly interacting bosons at zero temperature, described by the Hamiltonian $H = \sum\limits_k \epsilon_k a_k^\dagger a_k + \frac g 2 V \sum\limits_k \sum\limits_q a_k^\dagger a_q^\dagger a_k$. Task: Using mean-field theory and the Bogoliubov transformation, derive the spectrum of elementary excitations in terms of the interaction strength g and condensate density n_0."
+    final_solution: "$\omega_k = \sqrt \epsilon_k \left( \epsilon_k + 2 g n_0 \right)$"
+    ---
+    Output: {"is_non_trivial": true, "critique": "The derivation requires multi-step reasoning and advanced field-theoretical methods beyond standard textbook results."}
+    
+    CRITICAL: Your response MUST be ONLY a valid JSON object with NO other text before or after it.
+    The JSON object MUST have exactly these keys:
+    - "is_non_trivial": boolean
+    - "critique": string (a brief, one-sentence summary of your findings)
 
-  Problem:
-  ---
-  Problem Statement: {problem_statement}
-  Final Solution: {final_solution}
-  ---
+    IMPORTANT: If the problem is not sufficiently difficult, or the answer is provided in the problem statement, "is_non_trivial" must be false.
 
+    Problem:
+    ---
+    problem_statement: "{problem_statement}"
+    End problem statement. Below is the Final Solution. Check to make sure the expression shown below is not explicitly included in the above problem_statement:
+    ---
+    final_solution: "{final_solution}"
+    ---
   """,
       expected_output="A valid JSON object containing the fields 'is_non_trivial' and 'critique'.",
       agent=difficulty_critic,
@@ -202,9 +226,9 @@ def create_agents_and_tasks():
     ---
 
     Now, evaluate this problem:
-    problem_statement: {problem_statement}
+    problem_statement: "{problem_statement}"
 
-    You MUST NOT accept any questions that ask for a proof or to show a specific result. 
+    Again, you MUST REJECT any question thats ask for a proof or to show a specific result! Be very careful: many problems will include the solution expression in the prompt and ask to show or prove that expression. Any such problem must be rejected!
     """,
       expected_output="A valid JSON object containing the fields 'is_useful_derivation' and 'critique'.",
       agent=derivation_usefulness_critic,
@@ -232,8 +256,10 @@ def create_agents_and_tasks():
   }
   Now, here is the original problem:
   ---
-  problem_statement: {problem_statement}
-  final_solution: {final_solution}
+  problem_statement: "{problem_statement}"
+  ---
+  and here is the final solution:
+  final_solution: "{final_solution}"
   ---
 
   Review the critiques that follow and revise the problem if necessary. Do not make any changes if no issues are raised. Make sure all LaTeX is wrapped in $$. Do not use any special characters or unicode characters in your response; replace any of these characters in the original problem-solution with proper LaTeX!
@@ -301,7 +327,7 @@ def extract_and_combine_tex_files(archive_path):
         
     return None
 
-def process_paper(paper_data):
+def process_paper(paper_data, output_dir, agents_and_tasks, no_debug=False):
     (
         self_containment_critic,
         difficulty_critic,
@@ -311,9 +337,9 @@ def process_paper(paper_data):
         task_critique_difficulty,
         task_critique_usefulness,
         task_refine_problem,
-    ) = create_agents_and_tasks()
+    ) = agents_and_tasks
     paper_id = paper_data["paper_id"]
-    archive_glob_path = os.path.join("output/papers/arxiv_papers", f"{paper_id}*.tar.gz")
+    archive_glob_path = os.path.join(output_dir, "papers/arxiv_papers", f"{paper_id}*.tar.gz")
     found_archives = glob.glob(archive_glob_path)
 
     print(f"Glob path: {archive_glob_path}")
@@ -350,17 +376,17 @@ def process_paper(paper_data):
         debug_outputs = {}
 
         # The self-containment critique is not needed for gating; commenting out to save API calls.
-        # try:
-        #     sc_crew = Crew(agents=[self_containment_critic], tasks=[task_critique_self_containment], verbose=False)
-        #     sc_result = sc_crew.kickoff(inputs=inputs)
-        #     sc_parsed = sc_result.json_dict
-        #     if sc_parsed:
-        #         critiques["self_containment"] = sc_parsed
-        #     else:
-        #         raise ValueError("Failed to get structured output from self-containment critique")
-        # except Exception as e:
-        #     print(f"Error in self-containment critique: {e}")
-        #     critiques["self_containment"] = {"error": str(e)}
+        try:
+            sc_crew = Crew(agents=[self_containment_critic], tasks=[task_critique_self_containment], verbose=False)
+            sc_result = sc_crew.kickoff(inputs=inputs)
+            sc_parsed = sc_result.json_dict
+            if sc_parsed:
+                critiques["self_containment"] = sc_parsed
+            else:
+                raise ValueError("Failed to get structured output from self-containment critique")
+        except Exception as e:
+            print(f"Error in self-containment critique: {e}")
+            critiques["self_containment"] = {"error": str(e)}
 
         try:
             diff_crew = Crew(agents=[difficulty_critic], tasks=[task_critique_difficulty], verbose=False)
@@ -482,18 +508,29 @@ def process_paper(paper_data):
             }
             critiques_for_paper.append(critique_entry)
 
-        debug_filename = f"output/critiques/debug/{paper_id}_problem_{i}_debug.json"
-        with open(debug_filename, "w", encoding="utf-8") as f:
-            json.dump({
-                "paper_id": paper_id,
-                "problem_index": i,
-                "problem_statement": problem["problem_statement"],
-                "final_solution": problem["final_solution"],
-                "debug_outputs": debug_outputs,
-                "critiques_parsed": critiques,
-            }, f, indent=2, ensure_ascii=False)
+        if not no_debug:
+            debug_filename = os.path.join(output_dir, "critiques/debug", f"{paper_id}_problem_{i}_debug.json")
+            with open(debug_filename, "w", encoding="utf-8") as f:
+                json.dump({
+                    "paper_id": paper_id,
+                    "problem_index": i,
+                    "problem_statement": problem["problem_statement"],
+                    "final_solution": problem["final_solution"],
+                    "debug_outputs": debug_outputs,
+                    "critiques_parsed": critiques,
+                }, f, indent=2, ensure_ascii=False)
 
         processed += 1
+
+    # === Persist critiques for this paper immediately ===
+    paper_critiques_path = os.path.join(output_dir, "critiques", f"{paper_id}_critiques.json")
+    try:
+        with open(paper_critiques_path, "w", encoding="utf-8") as f:
+            json.dump(critiques_for_paper, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error writing critiques for paper {paper_id}: {e}")
+
+    # === End immediate persistence ===
 
     if refined_problems_for_paper:
         return {
@@ -501,19 +538,26 @@ def process_paper(paper_data):
             "problems": refined_problems_for_paper,
         }, critiques_for_paper, processed, removed, parse_fail_useful
 
-    return None
+    # Return empty refined list but still provide critiques
+    return {
+        "paper_id": paper_id,
+        "problems": [],
+    }, critiques_for_paper, processed, removed, parse_fail_useful
 
 # --- Main Execution ---
 
 def main():
-    os.makedirs("output/critiques", exist_ok=True)
-    os.makedirs("output/critiques/debug", exist_ok=True)
-    
     parser = argparse.ArgumentParser(description="Refine problems from a consolidated JSON file.")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
+    )
     parser.add_argument(
         "--input-file",
         type=str,
-        default="output/problems/all_papers_problems_filtered.json",
+        default=None,
         help="Path to the consolidated JSON file with problems to refine."
     )
     parser.add_argument(
@@ -533,21 +577,35 @@ def main():
         action="store_true",
         help="Overwrite existing output files instead of appending."
     )
+    parser.add_argument(
+        "--no-debug",
+        action="store_true",
+        help="Do not write per-problem debug JSON files."
+    )
+
     args = parser.parse_args()
 
+    os.makedirs(os.path.join(args.output_dir, "critiques"), exist_ok=True)
+    os.makedirs(os.path.join(args.output_dir, "critiques/debug"), exist_ok=True)
+    
+    input_file = args.input_file
+    if input_file is None:
+        input_file = os.path.join(args.output_dir, "problems/all_papers_problems_filtered.json")
+
+
     try:
-        with open(args.input_file, 'r', encoding='utf-8') as f:
+        with open(input_file, 'r', encoding='utf-8') as f:
             all_papers_data = json.load(f)
     except FileNotFoundError:
-        print(f"Error: Input file not found at {args.input_file}")
+        print(f"Error: Input file not found at {input_file}")
         sys.exit(1)
     except Exception as e:
         print(f"Error reading input file: {e}")
         sys.exit(1)
 
     # --- Load existing data to support incremental runs ---
-    output_filename = "output/problems/refined_problems.json"
-    critiques_filename = "output/critiques/all_critiques.json"
+    output_filename = os.path.join(args.output_dir, "problems/refined_problems.json")
+    critiques_filename = os.path.join(args.output_dir, "critiques/all_critiques.json")
     
     existing_refined_problems = set()
     all_refined_papers = []
@@ -600,8 +658,9 @@ def main():
     papers_skipped = 0
     total_parse_fail_useful = 0
     
+    agents_and_tasks = create_agents_and_tasks()
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        future_to_paper_data = {executor.submit(process_paper, p): p for p in new_papers_to_process}
+        future_to_paper_data = {executor.submit(process_paper, p, args.output_dir, agents_and_tasks, args.no_debug): p for p in new_papers_to_process}
         for future in as_completed(future_to_paper_data):
             paper_data = future_to_paper_data[future]
             result = future.result()

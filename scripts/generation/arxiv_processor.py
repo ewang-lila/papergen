@@ -61,8 +61,8 @@ def search_and_download_papers(max_results_per_category=5):
     # problematic paper instead of hanging the entire run.
     socket.setdefaulttimeout(15)
 
-    end_date = datetime.now() - timedelta(weeks=10)
-    start_date = datetime.now() - timedelta(weeks=15)
+    end_date = datetime.now() - timedelta(weeks=25)
+    start_date = datetime.now() - timedelta(weeks=50)
     
     # Format dates for the arXiv query
     start_date_str = start_date.strftime("%Y%m%d")
@@ -80,38 +80,44 @@ def search_and_download_papers(max_results_per_category=5):
             sort_order=arxiv.SortOrder.Descending,
         )
 
-        for result in client.results(search):
-            print(f"Found paper: {result.title} ({result.entry_id})")
-            
-            if result.comment:
-                match = re.search(r'(\d+)\s+pages', result.comment)
-                if match:
-                    try:
-                        pages = int(match.group(1))
-                        if pages > 40:
-                            print(f"Skipping paper due to length ({pages} pages): {result.title}")
-                            continue
-                    except ValueError:
-                        # If parsing fails, proceed to download
-                        pass
+        try:
+            for result in client.results(search):
+                print(f"Found paper: {result.title} ({result.entry_id})")
+                
+                if result.comment:
+                    match = re.search(r'(\d+)\s+pages', result.comment)
+                    if match:
+                        try:
+                            pages = int(match.group(1))
+                            if pages > 40:
+                                print(f"Skipping paper due to length ({pages} pages): {result.title}")
+                                continue
+                        except ValueError:
+                            # If parsing fails, proceed to download
+                            pass
 
-            try:
-                # Download the source (.tar.gz) file
-                filename = result.download_source(dirpath=DOWNLOAD_DIR)
-                downloaded_files.append(filename)
-                print(f"Downloaded source to: {filename}")
-                download_counter += 1
+                try:
+                    # Download the source (.tar.gz) file
+                    filename = result.download_source(dirpath=DOWNLOAD_DIR)
+                    downloaded_files.append(filename)
+                    print(f"Downloaded source to: {filename}")
+                    download_counter += 1
 
-                if download_counter % 4 == 0:
-                    print("Pausing for 1 second to respect arXiv API rate limits...")
-                    time.sleep(1)
+                    if download_counter % 4 == 0:
+                        print("Pausing for 1 second to respect arXiv API rate limits...")
+                        time.sleep(1)
 
-            except socket.timeout:
-                # Skip this paper if the 15-second timeout is hit
-                print(f"Timeout reached while downloading source for {result.entry_id}. Skipping this paper.")
-                continue
-            except Exception as e:
-                print(f"Error downloading source for {result.entry_id}: {e}")
+                except socket.timeout:
+                    # Skip this paper if the 15-second timeout is hit
+                    print(f"Timeout reached while downloading source for {result.entry_id}. Skipping this paper.")
+                    continue
+                except Exception as e:
+                    print(f"Error downloading source for {result.entry_id}: {e}")
+        except arxiv.UnexpectedEmptyPageError:
+            print(f"Warning: arXiv API returned fewer results than requested for category '{category}'.")
+            print("This can happen if a category has fewer papers than --npapers. Continuing to next category.")
+            continue
+
     return downloaded_files
 
 def extract_and_combine_tex_files(archive_path):
@@ -207,7 +213,7 @@ def parse_llm_output(output_text: str):
         print(f"Error parsing LLM output: {e}")
         return None
 
-def generate_single_problem(tex_content: str, segment: str, problem_number: int):
+def generate_single_problem(tex_content: str, segment: str, problem_number: int, custom_prompt: str | None = None):
     """
     Sends the LaTeX content to the OpenAI model to generate a single problem.
     """
@@ -215,7 +221,7 @@ def generate_single_problem(tex_content: str, segment: str, problem_number: int)
         print("Error: OPENAI_API_KEY environment variable not set.")
         return None
 
-    prompt = LLM_PROMPT_TEMPLATE.format(segment=segment, problem_number=problem_number)
+    prompt = custom_prompt if custom_prompt is not None else LLM_PROMPT_TEMPLATE.format(segment=segment, problem_number=problem_number)
     client = OpenAI(api_key=OPENAI_API_KEY)
     try:
         response = client.chat.completions.create(
@@ -233,7 +239,7 @@ def generate_single_problem(tex_content: str, segment: str, problem_number: int)
         print(f"An unexpected error occurred with OpenAI API: {e}")
         return None
 
-def generate_single_problem_gemini(tex_content: str, segment: str, problem_number: int):
+def generate_single_problem_gemini(tex_content: str, segment: str, problem_number: int, custom_prompt: str | None = None):
     """
     Sends the LaTeX content to the Google Gemini model to generate a single problem.
     """
@@ -244,7 +250,7 @@ def generate_single_problem_gemini(tex_content: str, segment: str, problem_numbe
     try:
         client = genai.Client(api_key=GOOGLE_API_KEY)
         
-        prompt = LLM_PROMPT_TEMPLATE.format(segment=segment, problem_number=problem_number)
+        prompt = custom_prompt if custom_prompt is not None else LLM_PROMPT_TEMPLATE.format(segment=segment, problem_number=problem_number)
         
         # Combine the prompt and the paper content
         full_prompt = f"{prompt}\\n\\nHere is the LaTeX content:\\n\\n{tex_content}"
@@ -271,22 +277,54 @@ def process_archive(archive: str, model: str):
         return None
 
     problems_data = []
-    segments = ["first half", "second half"]
-    for i, segment in enumerate(segments):
-        print(f'Generating problem for segment {segment} using {model}...')
-        if model == "gemini":
-            raw_output = generate_single_problem_gemini(combined_tex_content, segment, i + 1)
-        else:
-            raw_output = generate_single_problem(combined_tex_content, segment, i + 1)
 
-        if raw_output:
-            parsed_problem = parse_llm_output(raw_output)
-            if parsed_problem:
-                problems_data.append(parsed_problem)
-            else:
-                print(f"Could not parse LLM output for the {segment} segment.")
+    # -------- First problem generation --------
+    print(f'Generating first problem using {model}...')
+    if model == "gemini":
+        raw_output_1 = generate_single_problem_gemini(combined_tex_content, "first", 1)
+    else:
+        raw_output_1 = generate_single_problem(combined_tex_content, "first", 1)
+
+    if raw_output_1:
+        parsed_1 = parse_llm_output(raw_output_1)
+        if parsed_1:
+            problems_data.append(parsed_1)
+            first_solution = parsed_1.get("final_solution", "")
         else:
-            print(f"LLM did not return a response for the {segment} segment.")
+            print("Could not parse LLM output for first problem.")
+            first_solution = ""
+    else:
+        print("LLM did not return a response for the first problem.")
+        first_solution = ""
+
+    # -------- Second problem generation, with duplicate avoidance --------
+    if first_solution:
+        exclusion_clause = (
+            "\n\nIMPORTANT: You have already produced a problem whose final answer was "
+            f"\\boxed{{{first_solution}}}. For your next problem you MUST choose a different "
+            "but still significant and complex result from the paper. Do not produce a task whose correct answer is equivalent to or a slight variation of "
+            "the first solution. Pick a fundamentally different result."
+        )
+
+        template_base = LLM_PROMPT_TEMPLATE.format(segment="second", problem_number=2)
+        second_prompt = template_base + exclusion_clause
+
+        print('Generating second problem with duplicate avoidance...')
+        if model == "gemini":
+            raw_output_2 = generate_single_problem_gemini(combined_tex_content, "second", 2, custom_prompt=second_prompt)
+        else:
+            raw_output_2 = generate_single_problem(combined_tex_content, "second", 2, custom_prompt=second_prompt)
+
+        if raw_output_2:
+            parsed_2 = parse_llm_output(raw_output_2)
+            if parsed_2:
+                problems_data.append(parsed_2)
+            else:
+                print("Could not parse LLM output for second problem.")
+        else:
+            print("LLM did not return a response for the second problem.")
+    else:
+        print("Skipping second problem generation due to failure in first problem.")
 
     if not problems_data:
         print(f"Could not generate any problems for {archive}")
@@ -307,6 +345,12 @@ def process_archive(archive: str, model: str):
 def main():
     print('Starting main execution...')
     parser = argparse.ArgumentParser(description="Fetch arXiv papers, process them with an LLM, and save the results.")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
+    )
     parser.add_argument(
         "--no-download",
         action="store_true",
@@ -343,6 +387,10 @@ def main():
         help="Reprocess papers even if they already exist in all_papers.json"
     )
     args = parser.parse_args()
+
+    global DOWNLOAD_DIR, OUTPUT_DIR
+    DOWNLOAD_DIR = os.path.join(args.output_dir, "papers/arxiv_papers")
+    OUTPUT_DIR = os.path.join(args.output_dir, "papers/initial_QA_pairs")
 
     setup_directories()
     print('Directories set up.')

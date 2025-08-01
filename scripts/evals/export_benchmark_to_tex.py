@@ -226,13 +226,19 @@ def export_benchmark_to_tex(benchmark_results_file, output_tex_file, model_name,
     print(f"pdflatex -output-directory={pdf_dir_rel_path} {main_tex_file_rel_path}")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Export benchmark results to LaTeX")
     parser.add_argument(
         "--model",
         type=str,
         required=True,
         help="The model name for which to generate the report (e.g., o3-mini, gpt-4o)."
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="The base directory for all output files."
     )
     parser.add_argument(
         "--correct-only",
@@ -246,9 +252,9 @@ if __name__ == "__main__":
     # Sanitise model name for directory/file paths
     sanitized_model_name = original_model_name.replace("openai/", "").replace("/", "-")
 
-    model_results_dir = f"output/results/{sanitized_model_name}"
+    model_results_dir = os.path.join(args.output_dir, "results", sanitized_model_name)
 
-    benchmark_results_file = f"{model_results_dir}/benchmark_results_{sanitized_model_name}.json"
+    benchmark_results_file = os.path.join(model_results_dir, f"benchmark_results_{sanitized_model_name}.json")
     
     tex_dir = os.path.join(model_results_dir, "tex")
     os.makedirs(tex_dir, exist_ok=True)
@@ -260,4 +266,7 @@ if __name__ == "__main__":
         output_tex_file,
         original_model_name,
         correct_only=args.correct_only,
-    ) 
+    )
+
+if __name__ == "__main__":
+    main() 
